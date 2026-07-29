@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
+<!-- onnxruntime-web. .mjs 대신 클래식 스크립트를 쓰는 이유는 file:// 로 직접 열 때
+     ES 모듈 import 가 CORS(origin null)로 막히기 때문이다. wasm 은 CDN 에서 받고
+     (jsDelivr 는 Access-Control-Allow-Origin: * ), 스레드는 끈다 — SharedArrayBuffer
+     스레딩은 COOP/COEP 헤더를 요구하고 Vercel 정적 배포에는 그 헤더가 없다. -->
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/ort.wasm.min.js"></script>
 </head>
 <body>
 <x-dc>
@@ -238,9 +243,11 @@
                 <span class="num" style="font-family: var(--font-heading); font-weight: 500; font-size: 16px; color: var(--color-neutral-100);">{{ d.pctText }}</span>
               </div>
               <div style="height: 4px; border-radius: var(--radius-sm); background: var(--color-neutral-800); overflow: hidden;">
-                <div style="height: 100%; width: {{ d.pctText }}; background: var(--color-accent-500);"></div>
+                <div style="height: 100%; width: {{ d.barPct }}; background: var(--color-accent-500);"></div>
               </div>
-              <div style="font-size: 11px; color: var(--color-neutral-500);">{{ d.soloTag }}</div>
+              <div style="display: flex; justify-content: space-between; gap: var(--space-3); font-size: 11px; color: var(--color-neutral-500);">
+                <span>{{ d.soloTag }}</span><span class="num">{{ d.thrText }}</span>
+              </div>
               <!-- 2단계 결과. D 행에만 붙고, 게이트를 넘지 못하면 그 사실을 적는다. -->
               <div style="display: {{ d.drShow }}; flex-direction: column; gap: 2px; margin-top: var(--space-1); padding-left: var(--space-3); border-left: 1px solid var(--color-accent-800);">
                 <span style="font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-500);">2단계 · DR 중증도</span>
@@ -265,9 +272,11 @@
                 <span class="num" style="font-family: var(--font-heading); font-weight: 500; font-size: 16px; color: var(--color-neutral-100);">{{ d.pctText }}</span>
               </div>
               <div style="height: 4px; border-radius: var(--radius-sm); background: var(--color-neutral-800); overflow: hidden;">
-                <div style="height: 100%; width: {{ d.pctText }}; background: var(--color-accent-500);"></div>
+                <div style="height: 100%; width: {{ d.barPct }}; background: var(--color-accent-500);"></div>
               </div>
-              <div style="font-size: 11px; color: var(--color-neutral-500);">{{ d.soloTag }}</div>
+              <div style="display: flex; justify-content: space-between; gap: var(--space-3); font-size: 11px; color: var(--color-neutral-500);">
+                <span>{{ d.soloTag }}</span><span class="num">{{ d.thrText }}</span>
+              </div>
               <div style="display: {{ d.drShow }}; flex-direction: column; gap: 2px; margin-top: var(--space-1); padding-left: var(--space-3); border-left: 1px solid var(--color-accent-800);">
                 <span style="font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-500);">2단계 · DR 중증도</span>
                 <span class="num" style="font-size: 13px; color: var(--color-neutral-100);">{{ d.drText }}</span>
@@ -490,14 +499,38 @@ const LABEL_ORDER = ['N', 'D', 'G', 'A', 'H', 'O'];
 // 반드시 클래스별 sigmoid + binary cross-entropy 로 학습할 것.
 const MODEL_MULTILABEL = true;
 
-// 전처리 규격. 학습 때 쓴 값과 하나라도 다르면 추론이 조용히 틀린다.
-const MODEL_INPUT = { size: 224, channels: 3, scale: 1 / 255, mean: null, std: null };
+// 전처리 규격은 산출물의 preprocessing.json 에서 읽는다. 여기에 값을 복사해 두면
+// 모델을 갈아탈 때 두 곳이 갈라지고, 어긋나도 오류가 나지 않아 조용히 틀린다.
+const MODEL_META = '../../data/model/';
+const MODEL_STEM = 'stage1_odir_convnextv2_tiny';
 
-// 모델 산출물 위치 (아직 없음). tf.loadLayersModel 이 model.json 과 같은
-// 디렉토리의 *.bin 샤드를 함께 읽는다.
-const MODEL_URL = '../../data/model/model.json';
+// 가중치는 저장소에 없다(28.5MB). Hugging Face Hub 에서 런타임에 받는다 —
+// README 의 "팀원 안내" 참고. 환자 영상은 여전히 단말을 벗어나지 않는다.
+// 시연 직전에는 main 을 커밋 해시로 바꿔 고정할 것.
+const MODEL_URL = 'https://huggingface.co/HEROJ137/WINTER-retina-models'
+               + '/resolve/main/stage1_odir_convnextv2_tiny_int8.onnx';
 
+// 목업/로딩 중에만 쓰는 폴백 임계값. 실제 모델이 붙으면 THRESHOLDS(클래스별)가
+// 이 값을 대체한다 — 단일 임계값을 그대로 쓰면 안 된다. 산출물의 threshold 는
+// N .58 / D .52 / G .92 / A .87 / H .55 / O .55 로 클래스마다 크게 다르고,
+// 0.15 로 두면 G 에서 대량 과경보가 난다.
 const SUSPECT_MIN = 0.15;
+
+// 클래스별 임계값과 temperature. 모델 로드 후 postprocessing.json 으로 채워진다.
+let THRESHOLDS = null;
+
+function thrOf(code) {
+  return (THRESHOLDS && THRESHOLDS[code] !== undefined) ? THRESHOLDS[code] : SUSPECT_MIN;
+}
+
+// 임계값 대비 여유를 0~1 로 정규화한다. temperature 가 클래스마다 다르면(D·H·O 는
+// 5.0, G 는 0.71) 확률이 서로 다른 폭으로 압축돼 클래스 간 값 비교가 무의미해진다.
+// 0.55 는 H 에서는 임계값 위지만 G 에서는 한참 아래다. 막대 길이와 시급도 판단은
+// 이 정규화된 여유를 쓰고, 화면에 적는 숫자는 원값 그대로 둔다.
+function marginOf(code, p) {
+  const t = thrOf(code);
+  return t >= 1 ? 0 : Math.max(0, Math.min(1, (p - t) / (1 - t)));
+}
 
 // ── 2단계 모델 계약 (당뇨망막병증 중증도) ────────────────────────────────
 // 1단계와 성질이 다르다. 1단계는 다중라벨(한 눈에 여러 소견 공존)이지만,
@@ -516,7 +549,9 @@ const DR_MODEL_URL = '../../data/model-dr/model.json';
 // 1단계의 D 확률이 이 값을 넘은 눈에만 2단계를 돌린다. SUSPECT_MIN(0.15)보다
 // 높게 잡았다 — 의심 목록에 D 를 올리는 임계값과 등급을 붙이는 임계값은 다르다.
 // D 가 겨우 걸친 눈에 "3등급" 같은 단정적 병기를 붙이면 과신을 만든다.
-const DR_GATE = 0.5;
+// const 이 아닌 이유: 모델이 로드되면 postprocessing.json 의 D 임계값(0.524)으로
+// 교체된다. 0.5 는 모델이 없을 때만 쓰는 임의값이다.
+let DR_GATE = 0.5;
 
 // 학습 데이터에 "DR 없음"(grading_0) 등급이 없다. 그래서 2단계는 정상을 말할 수
 // 없고, 1단계가 D 를 틀리게 의심하면 2단계는 그래도 등급 하나를 자신 있게 낸다.
@@ -545,7 +580,9 @@ const SCENARIOS = [
 // 시나리오마다 협진·검사·경고를 손으로 쓰지 않는다. 검출된 라벨에서 파생시키면
 // 시나리오를 추가할 때 CSV 한 줄과 영상 2장만 넣어도 우측 패널이 전부 채워진다.
 // urgent=true 인 라벨은 확률이 URGENT_AT 을 넘을 때 시급도가 올라간다.
-const URGENT_AT = 0.7;
+// 시급도 승급 기준. 확률 절대값이 아니라 "임계값에서 1까지의 여유 중 얼마나
+// 올라왔는가"다. 클래스별 temperature 때문에 절대값은 클래스 간 비교가 안 된다.
+const URGENT_MARGIN = 0.5;
 
 // 시급도 문구는 사람이 읽는 값이지만 병합할 때는 비교가 필요하다. 여러 소견이 같은
 // 과로 몰릴 때 남겨야 하는 것은 "나중에 온 것"이 아니라 "가장 급한 것"이다.
@@ -645,42 +682,298 @@ const DR_GRADE_RULES = {
 // 1·2위 등급 차이가 이보다 작으면 "인접 등급과 근접"으로 본다.
 const DR_CLOSE_AT = 0.15;
 
+// ── 전처리 ──────────────────────────────────────────────────────────────
+// 학습 때와 하나라도 다르면 추론이 조용히 틀린다(오류가 나지 않는다). 파이썬 참조
+// 구현은 data/reference_infer.py 에 있고, 두 구현이 같은 텐서를 만드는지 수치로
+// 비교하는 작업이 남아 있다 — README "알려진 문제" 참고.
+//
+// 체인: FOV crop → square pad → resize 224 → histogram match → CLAHE(green) →
+//       ImageNet 정규화 → NCHW
+// 이 "순서"는 preprocessing.json 에 명시돼 있지 않아 가정한 것이다.
+
+function loadImage(url) {
+  return new Promise((ok, no) => {
+    const im = new Image();
+    im.crossOrigin = 'anonymous';
+    im.onload = () => ok(im);
+    im.onerror = () => no(new Error('영상을 읽을 수 없습니다: ' + url));
+    im.src = url;
+  });
+}
+
+function canvasOf(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  return c;
+}
+
+// 안저 원판의 바운딩 박스. 검은 배경을 남기면 정규화 통계가 오염된다.
+function fovBox(data, w, h, thr) {
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      // cv2.COLOR_BGR2GRAY 와 같은 계수
+      const g = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      if (g > thr) {
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+  }
+  return x1 < 0 ? { x: 0, y: 0, w: w, h: h } : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+
+// 채널별 CDF 매칭. 기준 CDF 는 학습셋 512장에서 만든 값이다. 안저 영상은 카메라·
+// 조명에 따라 색조가 크게 흔들리므로 학습셋 색분포로 끌어당겨야 추론 분포가 맞는다.
+// 마스크 밖(검은 배경)은 통계에서 뺀다 — 넣으면 0 이 대량 유입돼 매핑이 무너진다.
+function matchHistogram(px, n, ref, blend, thr) {
+  const refCdf = ref.cdf, refVal = ref.values;
+  const mask = new Uint8Array(n * n);
+  for (let i = 0, j = 0; i < n * n; i++, j += 4) {
+    const g = 0.299 * px[j] + 0.587 * px[j + 1] + 0.114 * px[j + 2];
+    mask[i] = g > thr ? 1 : 0;
+  }
+  for (let ch = 0; ch < 3; ch++) {          // 0=R 1=G 2=B, 기준 CDF 도 RGB 순서
+    const hist = new Float64Array(256);
+    let cnt = 0;
+    for (let i = 0, j = ch; i < n * n; i++, j += 4) {
+      if (mask[i]) { hist[px[j]]++; cnt++; }
+    }
+    if (!cnt) continue;
+    // 소스 CDF → 기준 CDF 역보간으로 LUT 를 만든다
+    const lut = new Float32Array(256);
+    let acc = 0, k = 0;
+    const rc = refCdf[ch], rv = refVal[ch];
+    for (let v = 0; v < 256; v++) {
+      acc += hist[v] / cnt;
+      while (k < 255 && rc[k] < acc) k++;
+      // np.interp 와 같은 선형 보간
+      if (k === 0) lut[v] = rv[0];
+      else {
+        const c0 = rc[k - 1], c1 = rc[k];
+        const t = c1 > c0 ? (acc - c0) / (c1 - c0) : 0;
+        lut[v] = rv[k - 1] + t * (rv[k] - rv[k - 1]);
+      }
+    }
+    for (let i = 0, j = ch; i < n * n; i++, j += 4) {
+      const v = px[j];
+      px[j] = Math.max(0, Math.min(255, Math.round((1 - blend) * v + blend * lut[v])));
+    }
+  }
+}
+
+// CLAHE. cv2.createCLAHE 와 같은 방식이다 — 타일별 히스토그램을 clipLimit 로 자르고
+// 초과분을 균등 재분배한 뒤 CDF LUT 을 만들고, 타일 경계는 이중선형 보간한다.
+// cv2 의 clipLimit 은 정규화된 값이라 실제 자르는 높이는 clip * 타일면적 / 256 이다.
+function clahe(plane, w, h, clipLimit, gx, gy) {
+  const tw = Math.ceil(w / gx), th = Math.ceil(h / gy);
+  const area = tw * th;
+  let clip = Math.max(1, Math.round(clipLimit * area / 256));
+  const luts = new Uint8Array(gx * gy * 256);
+
+  for (let ty = 0; ty < gy; ty++) {
+    for (let tx = 0; tx < gx; tx++) {
+      const hist = new Int32Array(256);
+      const xs = tx * tw, ys = ty * th;
+      const xe = Math.min(xs + tw, w), ye = Math.min(ys + th, h);
+      for (let y = ys; y < ye; y++) {
+        for (let x = xs; x < xe; x++) hist[plane[y * w + x]]++;
+      }
+      let excess = 0;
+      for (let v = 0; v < 256; v++) if (hist[v] > clip) { excess += hist[v] - clip; hist[v] = clip; }
+      const inc = Math.floor(excess / 256);
+      let rest = excess - inc * 256;
+      for (let v = 0; v < 256; v++) hist[v] += inc;
+      // 남은 픽셀은 cv2 와 같이 일정 간격으로 흩뿌린다
+      if (rest > 0) {
+        const step = Math.max(1, Math.floor(256 / rest));
+        for (let v = 0; v < 256 && rest > 0; v += step) { hist[v]++; rest--; }
+        for (let v = 0; v < 256 && rest > 0; v++) { hist[v]++; rest--; }
+      }
+      const n = (xe - xs) * (ye - ys);
+      const scale = 255 / n;
+      let sum = 0, base = (ty * gx + tx) * 256;
+      for (let v = 0; v < 256; v++) {
+        sum += hist[v];
+        luts[base + v] = Math.max(0, Math.min(255, Math.round(sum * scale)));
+      }
+    }
+  }
+
+  const out = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    // 타일 중심 기준 좌표
+    let fy = y / th - 0.5, ty0 = Math.floor(fy);
+    let wy = fy - ty0;
+    if (ty0 < 0) { ty0 = 0; wy = 0; }
+    let ty1 = Math.min(ty0 + 1, gy - 1);
+    if (ty0 > gy - 1) { ty0 = ty1 = gy - 1; wy = 0; }
+    for (let x = 0; x < w; x++) {
+      let fx = x / tw - 0.5, tx0 = Math.floor(fx);
+      let wx = fx - tx0;
+      if (tx0 < 0) { tx0 = 0; wx = 0; }
+      let tx1 = Math.min(tx0 + 1, gx - 1);
+      if (tx0 > gx - 1) { tx0 = tx1 = gx - 1; wx = 0; }
+      const v = plane[y * w + x];
+      const a = luts[(ty0 * gx + tx0) * 256 + v], b = luts[(ty0 * gx + tx1) * 256 + v];
+      const c = luts[(ty1 * gx + tx0) * 256 + v], d = luts[(ty1 * gx + tx1) * 256 + v];
+      out[y * w + x] = Math.round((a * (1 - wx) + b * wx) * (1 - wy) + (c * (1 - wx) + d * wx) * wy);
+    }
+  }
+  return out;
+}
+
+// 영상 → NCHW Float32Array. meta 는 preprocessing.json + color_reference.json.
+function preprocess(img, meta) {
+  const pre = meta.pre, ref = meta.ref;
+  const thr = (ref && ref.mask_threshold !== undefined) ? ref.mask_threshold : 12;
+  const n = pre.img_size;
+
+  // 1) 원본을 캔버스로
+  let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+  let cv = canvasOf(w, h), cx = cv.getContext('2d', { willReadFrequently: true });
+  cx.drawImage(img, 0, 0);
+  let box = { x: 0, y: 0, w: w, h: h };
+
+  // 2) FOV crop
+  if (pre.fov_crop) box = fovBox(cx.getImageData(0, 0, w, h).data, w, h, thr);
+
+  // 3) square pad + 4) resize 를 한 번의 drawImage 로 합친다. 정사각 캔버스의
+  //    가운데에 크롭 영역을 비율 유지해 그리면 패딩과 리사이즈가 동시에 끝난다.
+  const side = Math.max(box.w, box.h);
+  const dst = canvasOf(n, n), dc = dst.getContext('2d', { willReadFrequently: true });
+  dc.fillStyle = '#000';
+  dc.fillRect(0, 0, n, n);
+  const k = n / side;
+  dc.drawImage(img, box.x, box.y, box.w, box.h,
+               (n - box.w * k) / 2, (n - box.h * k) / 2, box.w * k, box.h * k);
+
+  const id = dc.getImageData(0, 0, n, n);
+  const px = id.data;
+
+  // 5) histogram match
+  if (pre.histogram_match && ref && ref.cdf) {
+    matchHistogram(px, n, ref, pre.color_match_blend === undefined ? 1 : pre.color_match_blend, thr);
+  }
+
+  // 6) CLAHE — green 채널만이 기본이다. 안저에서 병변 대비가 가장 큰 채널이다.
+  if (pre.clahe) {
+    const grid = pre.clahe_grid || [8, 8];
+    const chans = pre.clahe_green_only ? [1] : [0, 1, 2];
+    for (let ci = 0; ci < chans.length; ci++) {
+      const ch = chans[ci];
+      const plane = new Uint8Array(n * n);
+      for (let i = 0, j = ch; i < n * n; i++, j += 4) plane[i] = px[j];
+      const eq = clahe(plane, n, n, pre.clahe_clip_limit, grid[0], grid[1]);
+      for (let i = 0, j = ch; i < n * n; i++, j += 4) px[j] = eq[i];
+    }
+  }
+
+  // 7) ImageNet 정규화 → NCHW
+  const mean = pre.imagenet_mean || [0, 0, 0], std = pre.imagenet_std || [1, 1, 1];
+  const out = new Float32Array(3 * n * n);
+  const plane = n * n;
+  for (let i = 0, j = 0; i < plane; i++, j += 4) {
+    out[i] = (px[j] / 255 - mean[0]) / std[0];
+    out[plane + i] = (px[j + 1] / 255 - mean[1]) / std[1];
+    out[2 * plane + i] = (px[j + 2] / 255 - mean[2]) / std[2];
+  }
+  return out;
+}
+
 // ── 모델 연결 지점 ──────────────────────────────────────────────────────
-// 실제 연결은 MODEL.load() 와 MODEL.infer() 두 곳만 채우면 된다.
-// 화면 로직은 vector() 가 돌려주는 길이 6 확률 벡터만 알면 되고, 그 아래는 모른다.
+// 화면 로직은 infer() 가 돌려주는 길이 6 확률 벡터만 알면 되고, 그 아래는 모른다.
 const MODEL = {
   status: 'mock',        // 'mock' | 'loading' | 'ready' | 'error'
   net: null,
+  meta: null,
+  inputName: 'input',
+  outputName: 'logits',
 
-  // 모델 준비. 실제 연결 시:
-  //   this.net = await tf.loadLayersModel(MODEL_URL);
-  //   await this.net.predict(tf.zeros([1, MODEL_INPUT.size, MODEL_INPUT.size, 3])).data();  // 워밍업
   load: function () {
-    return Promise.resolve();          // 목업이라 로드할 것이 없다
+    if (typeof ort === 'undefined') {
+      return Promise.reject(new Error('onnxruntime-web 을 불러오지 못했습니다 (네트워크 확인)'));
+    }
+    // 스레딩은 COOP/COEP 헤더를 요구한다. Vercel 정적 배포에는 없으므로 끈다 —
+    // 켜 두면 워커 생성이 실패하며 로드가 통째로 죽는다.
+    ort.env.wasm.numThreads = 1;
+    ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/';
+
+    const j = (s) => fetch(MODEL_META + MODEL_STEM + '_' + s + '.json').then(r => {
+      if (!r.ok) throw new Error(s + '.json 을 읽을 수 없습니다 (' + r.status + ')');
+      return r.json();
+    });
+    return Promise.all([
+      j('preprocessing'), j('postprocessing'), j('color_reference'),
+      ort.InferenceSession.create(MODEL_URL, { executionProviders: ['wasm'] })
+    ]).then(r => {
+      const pre = r[0], post = r[1], ref = r[2], net = r[3];
+      // 라벨 순서가 화면 계약과 다르면 즉시 멈춘다. 어긋난 채로 돌면 소견 이름이
+      // 뒤바뀐 화면이 나오고, 그건 오류보다 위험하다.
+      if (post.labels.join(',') !== LABEL_ORDER.join(',')) {
+        throw new Error('라벨 순서 불일치: 모델 [' + post.labels + '] vs 화면 [' + LABEL_ORDER + ']');
+      }
+      this.meta = { pre: pre, post: post, ref: ref };
+      this.net = net;
+      this.inputName = net.inputNames[0];
+      this.outputName = net.outputNames[0];
+      // 클래스별 임계값을 화면에 넘긴다. 단일 SUSPECT_MIN 을 대체한다.
+      THRESHOLDS = {};
+      LABEL_ORDER.forEach((c, i) => { THRESHOLDS[c] = post.thresholds[i]; });
+      // 2단계 게이트를 D 임계값에 묶는다. 임의값(0.5)이 아니라 학습 쪽에서
+      // d_target_recall 0.95 로 보정한 값을 쓴다.
+      DR_GATE = THRESHOLDS.D;
+      // 워밍업. 첫 추론에 wasm 컴파일이 겹치면 수 초가 더 걸린다.
+      const z = new ort.Tensor('float32', new Float32Array(3 * pre.img_size * pre.img_size),
+                               [1, 3, pre.img_size, pre.img_size]);
+      const feed = {}; feed[this.inputName] = z;
+      return net.run(feed);
+    }).then(() => undefined);
   },
 
-  // imgUrl → LABEL_ORDER 순서의 확률 배열(길이 6). 실제 연결 시:
-  //   const el = await loadImage(imgUrl);
-  //   const t = tf.tidy(() => tf.browser.fromPixels(el)
-  //       .resizeBilinear([MODEL_INPUT.size, MODEL_INPUT.size])
-  //       .toFloat().mul(MODEL_INPUT.scale).expandDims(0));
-  //   const out = await this.net.predict(t).data();  t.dispose();
-  //   return Array.from(out);          // sigmoid 출력, 합 != 1
-  //
-  // hint 는 목업 전용이다(정답 라벨). 실제 구현은 영상만 보고 무시해야 한다 —
-  // hint 를 참조하는 코드가 남으면 정답을 훔쳐보는 추론이 된다.
+  // imgUrl → LABEL_ORDER 순서의 확률 배열(길이 6). 다중라벨이라 합은 1이 아니다.
+  // hint 는 목업 전용(정답 라벨)이다. 실제 모델이 붙으면 절대 참조하지 않는다 —
+  // 참조가 남으면 정답을 훔쳐보는 추론이 된다.
   infer: function (imgUrl, hint) {
-    return Promise.resolve(mockVector(hint.labels, hint.seed));
+    if (!this.net) return Promise.resolve(mockVector(hint.labels, hint.seed));
+    const self = this;
+    return loadImage(imgUrl).then(img => {
+      const n = self.meta.pre.img_size;
+      const x = preprocess(img, self.meta);
+      const feed = {};
+      feed[self.inputName] = new ort.Tensor('float32', x, [1, 3, n, n]);
+      return self.net.run(feed);
+    }).then(out => {
+      const logits = out[self.outputName].data;
+      const t = self.meta.post.temperature;
+      // 출력은 로짓이다(실측: 음수가 나온다). 클래스별 temperature 로 나눈 뒤
+      // sigmoid — postprocessing.json 의 threshold_probability_space 와 같은 공간.
+      const p = [];
+      for (let i = 0; i < LABEL_ORDER.length; i++) {
+        p.push(1 / (1 + Math.exp(-logits[i] / (t ? t[i] : 1))));
+      }
+      return p;
+    });
   }
 };
 
 // ── 2단계 모델 연결 지점 ────────────────────────────────────────────────
 // 1단계와 같은 구조지만 별개의 모델이다. 가중치를 공유하지 않고 산출물도 따로 나온다.
+// 2단계 산출물은 아직 없다. status='unavailable' 이면 게이트를 넘은 눈이라도
+// 등급을 내지 않고 "모델 미연결"로 표시한다.
+//
+// 1단계가 실제 모델인데 2단계만 목업 등급을 내면, 화면에서 둘을 구별할 수 없어
+// 지어낸 병기가 실측값처럼 읽힌다. 그건 오류보다 위험하다 — 목업으로 되돌리지 말 것.
+// 2단계 가중치가 나오면 status 를 'mock' 이 아니라 'loading' 으로 바꾸고 아래
+// load/infer 를 MODEL 과 같은 방식으로 채운다.
 const DR_MODEL = {
-  status: 'mock',
+  status: 'unavailable',       // 'unavailable' | 'loading' | 'ready' | 'error' | 'mock'
   net: null,
+  meta: null,
 
-  // 실제 연결 시: this.net = await tf.loadLayersModel(DR_MODEL_URL);
   load: function () {
     return Promise.resolve();
   },
@@ -688,6 +981,7 @@ const DR_MODEL = {
   // imgUrl → DR_GRADE_ORDER 순서의 확률 배열(길이 4). softmax 라 합이 1이다.
   // hint 는 목업 전용(정답 등급)이며 실제 구현은 영상만 보고 무시해야 한다.
   infer: function (imgUrl, hint) {
+    if (this.status === 'unavailable') return Promise.resolve(null);
     return Promise.resolve(mockDrVector(hint.grade, hint.seed));
   }
 };
@@ -770,7 +1064,7 @@ function inferScenario(sc) {
     return DR_MODEL.infer(
       IMG + sc[eye + 'Image'],
       { grade: sc[eye === 'os' ? 'osDrGrade' : 'odDrGrade'], seed: sc.scenario_no + eye + 'dr' }
-    ).then(v => toGrade(v, d));
+    ).then(v => v ? toGrade(v, d) : null);      // null = 2단계 모델 없음
   };
 
   return Promise.all([one('os'), one('od')]).then(r =>
@@ -840,7 +1134,7 @@ function clinical(sc, osPreds, odPreds, osDr, odDr) {
   const found = {};
   [['os', osPreds], ['od', odPreds]].forEach(pair => {
     pair[1].forEach(d => {
-      if (d[0] === 'N' || d[1] < SUSPECT_MIN) return;
+      if (d[0] === 'N' || d[1] < thrOf(d[0])) return;
       (found[d[0]] || (found[d[0]] = { code: d[0], os: 0, od: 0 }))[pair[0]] = d[1];
     });
   });
@@ -872,9 +1166,12 @@ function clinical(sc, osPreds, odPreds, osDr, odDr) {
 
   codes.sort((a, b) => hiOf(b) - hiOf(a)).forEach(code => {
     const r = RULES[code] || RULES.O;
+    // 시급도 승급은 고정 확률(0.7)이 아니라 임계값 대비 정규화된 여유로 판단한다.
+    // temperature 가 클래스마다 다르면(H·O 는 5.0) 확률이 0.6 을 넘지 못해 고정
+    // 기준으로는 어떤 H 케이스도 절대 승급되지 않는다.
     const urgency = (code === 'D' && drWorst)
       ? drWorst.urgency
-      : (hiOf(code) >= URGENT_AT ? r.urgent : r.normal);
+      : (marginOf(code, hiOf(code)) >= URGENT_MARGIN ? r.urgent : r.normal);
     const reason = (code === 'D' && drWorst) ? drWorst.reason : r.reason;
     const driver = (LABELS[code] || code) + ' — ' + evidence(code);
 
@@ -912,7 +1209,7 @@ function clinical(sc, osPreds, odPreds, osDr, odDr) {
 
   // (1) 동반 소견 — 한 환자가 한 가지 병만 갖고 있다고 가정하지 않는다.
   if (codes.length > 1) {
-    const perEye = (eye) => codes.filter(c => found[c][eye] >= SUSPECT_MIN);
+    const perEye = (eye) => codes.filter(c => found[c][eye] >= thrOf(c));
     const o = perEye('os'), d = perEye('od');
     const solo = codes.filter(c => !(found[c].os && found[c].od));
     const parts = [];
@@ -995,7 +1292,11 @@ class Component extends DCLogic {
     Promise.all([MODEL.load(), DR_MODEL.load()]).then(() => {
       if (!this._alive) return;
       MODEL.status = 'ready';
-      DR_MODEL.status = 'ready';
+      // DR_MODEL 은 여기서 'ready' 로 올리지 않는다. 가중치가 없는데 상태만 올리면
+      // infer() 의 unavailable 가드가 풀려 목업 등급이 실측값처럼 화면에 뜬다 —
+      // 1단계가 실제 모델인 상황에서 그건 지어낸 병기를 근거로 의뢰를 보내는 것이다.
+      // 실제로 겪은 버그이므로 되돌리지 말 것. net 이 생겼을 때만 올린다.
+      if (DR_MODEL.net) DR_MODEL.status = 'ready';
       this.setState({ modelStatus: 'ready' });
       this.infer(this.state.idx);
     }, (e) => {
@@ -1065,13 +1366,20 @@ class Component extends DCLogic {
     const other = eye === 'os' ? 'od' : 'os';
     const otherAt = (code) => (p[other].preds.find(d => d[0] === code) || [])[1] || 0;
 
-    return p[eye].preds.filter(d => d[0] !== 'N' && d[1] >= SUSPECT_MIN).map(d => {
+    return p[eye].preds.filter(d => d[0] !== 'N' && d[1] >= thrOf(d[0])).map(d => {
       const code = d[0], isD = code === 'D';
-      const solo = otherAt(code) < SUSPECT_MIN;
+      const solo = otherAt(code) < thrOf(code);
+      // 게이트를 넘었는데 등급이 없으면 2단계 모델이 없는 것이고, 못 넘었으면
+      // 돌리지 않은 것이다. 화면에서 두 상태를 구분해야 한다.
+      const gated = isD && !dr && d[1] >= DR_GATE;
       return {
         code: code,
         label: LABELS[code] || code,
         pctText: pct(d[1]),
+        // 막대는 원값이 아니라 임계값 대비 정규화된 여유다. 원값을 그대로 그리면
+        // 임계값 0.92 인 G 의 0.93 이 임계값 0.52 인 D 의 0.60 보다 길어 보인다.
+        barPct: Math.round(marginOf(code, d[1]) * 100) + '%',
+        thrText: '임계 ' + pct(thrOf(code)),
         // 반대쪽 눈에 없는 소견임을 적는다 — 이 눈만의 소견이라는 뜻이지,
         // 덜 중요하다는 뜻이 아니다.
         soloTag: solo ? '이 눈에서만' : '양안 공통',
@@ -1079,15 +1387,19 @@ class Component extends DCLogic {
         drShow: isD ? 'flex' : 'none',
         drText: !isD ? '' : (dr
           ? dr.grade + '등급 · ' + (DR_LABELS[dr.grade] || '') + '  ' + pct(dr.p)
-          : '중증도 미측정'),
+          : (gated ? '중증도 미판정 — 2단계 모델 미연결' : '중증도 미측정')),
         drNote: !isD ? '' : (dr
           ? (dr.close
               ? '2위 ' + dr.second + '등급 ' + pct(dr.secondP) + ' 와 근접 — 인접 등급은 사진만으로 '
                 + '구분이 어렵습니다. 더 심한 ' + dr.action + '등급 기준으로 대응합니다.'
               : '2위 ' + dr.second + '등급 ' + pct(dr.secondP) + ' · 1단계 D 유사도 ' + pct(dr.gateP)
                 + ' 조건부')
-          : 'D 유사도가 ' + pct(DR_GATE) + ' 미만이라 2단계를 돌리지 않았습니다. '
-            + '근거 없는 병기를 붙이지 않기 위한 게이트입니다.')
+          : (gated
+              ? 'D 유사도 ' + pct(d[1]) + ' 로 게이트(' + pct(DR_GATE) + ')는 넘었지만 중증도 '
+                + '모델이 아직 없습니다. 경증인지 증식성인지는 이 화면으로 판단할 수 없습니다 — '
+                + '안과에서 병기를 확인해야 합니다.'
+              : 'D 유사도가 ' + pct(DR_GATE) + ' 미만이라 2단계를 돌리지 않았습니다. '
+                + '근거 없는 병기를 붙이지 않기 위한 게이트입니다.'))
       };
     });
   }
@@ -1261,15 +1573,17 @@ class Component extends DCLogic {
       // 이유는 빈 문자열도 "값 없음"으로 봐야 하기 때문이다 — 여기에 고정 문구가 박히면
       // 모델 로딩·추정 중·목업 여부가 화면에서 사라지고, 없는 모델 버전을 주장하게 된다.
       modelTag: this.props.modelTag || (function (st) {
-        // 2단계는 조건부라 항상 돌지 않는다. 라벨셋 뒤에 게이트를 같이 적어
+        // 2단계는 조건부라 항상 돌지 않는다. 게이트와 2단계 상태를 함께 적어
         // "등급이 없는 눈"이 오류가 아니라 설계라는 것을 화면에서 알 수 있게 한다.
+        const stage2 = DR_MODEL.status === 'unavailable'
+          ? '2단계 미연결' : '2단계 {' + DR_GRADE_ORDER.join(',') + '}';
         const set = ' · 1단계 {' + LABEL_ORDER.join(',') + '} → D ≥ '
-          + Math.round(DR_GATE * 100) + '% 인 눈만 2단계 {' + DR_GRADE_ORDER.join(',') + '}';
+          + Math.round(DR_GATE * 100) + '% 인 눈만 ' + stage2;
         if (st.modelStatus === 'error') return '모델 오류 — ' + st.modelError;
-        if (st.modelStatus === 'loading') return '모델 로딩 중' + set;
+        if (st.modelStatus === 'loading') return '모델 로딩 중 (28.5MB)' + set;
         if (!preds) return '추정 중' + set;
-        return (MODEL.status === 'mock' || MODEL.status === 'ready' && !MODEL.net
-                ? '목업 추정 · 모델 미연결' : 'retina-cls + dr-grade · TF.js') + set;
+        return (MODEL.net ? 'stage1 ConvNeXt V2-Tiny int8 · ONNX Runtime Web'
+                          : '목업 추정 · 모델 미연결') + set;
       })(this.state),
       picker: this.state.picker,
       togglePicker: () => this.setState(st => ({ picker: !st.picker })),
