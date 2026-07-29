@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/nocturne-d197642e-7023-44a8-a4c9-118af4c54008/styles.css">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --font-heading: "Inter", "Noto Sans KR", system-ui, sans-serif;
+    --font-body: "Inter", "Noto Sans KR", system-ui, sans-serif;
+    --color-bg: #23272F;
+    --color-surface: #2B2F36;
+    --color-text: #F3F4F6;
+    --color-accent: #3B82F6;
+    --color-divider: rgba(243, 244, 246, 0.14);
+    --color-neutral-100: #F3F4F6;
+    --color-neutral-200: #DFE3EA;
+    --color-neutral-300: #B0B8C4;
+    --color-neutral-400: #8F98A6;
+    --color-neutral-500: #6E7683;
+    --color-neutral-600: #545B66;
+    --color-neutral-700: #3F4650;
+    --color-neutral-800: #333841;
+    --color-neutral-900: #1E1E1E;
+    --color-accent-100: #EFF6FF;
+    --color-accent-200: #DBEAFE;
+    --color-accent-300: #93C0FC;
+    --color-accent-400: #60A5FA;
+    --color-accent-500: #3B82F6;
+    --color-accent-600: #2E6FDD;
+    --color-accent-700: #1D4ED8;
+    --color-accent-800: #1E3A8A;
+    --color-accent-900: #17275C;
+    --c-ok: #22C55E;
+    --c-warn: #F59E0B;
+    --c-danger: #EF4444;
+  }
+  body { margin: 0; -webkit-font-smoothing: antialiased; }
+  .num { font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
+  .onimg { text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 14px rgba(0, 0, 0, 0.6); }
+  /* 안저 사진은 좌우반전해서 보여준다(임상 열람 편의). 사진 래퍼에만 걸어
+     그 안의 CAM 박스까지 함께 반전시키고, 위에 얹히는 텍스트 오버레이는 건드리지 않는다. */
+  .mirror { transform: scaleX(-1); }
+  a { color: var(--color-accent-300); }
+  a:hover { color: var(--color-accent); }
+  * { scrollbar-width: thin; scrollbar-color: var(--color-neutral-700) transparent; }
+</style>
+</helmet>
+
+<div style="width: 1920px; height: 1080px; box-sizing: border-box; display: grid; grid-template-columns: 1fr 452px; grid-template-rows: 78px 1fr 232px; gap: var(--space-2); padding: var(--space-2); background: var(--color-bg); color: var(--color-text); font-family: var(--font-body); overflow: hidden;">
+
+  <div style="grid-column: 1; grid-row: 1; display: flex; align-items: stretch; background: var(--color-surface); border-radius: var(--radius-md); overflow: hidden;">
+    <div style="display: flex; flex-direction: column; justify-content: center; gap: 1px; padding: 0 var(--space-6); min-width: 306px;">
+      <div style="display: flex; align-items: baseline; gap: var(--space-3);">
+        <span style="font-family: var(--font-heading); font-weight: 500; font-size: 25px; line-height: 1.12; letter-spacing: -0.015em;">{{ p.name }}</span>
+        <span style="font-size: 15px; color: var(--color-neutral-300);">{{ p.ageSex }}</span>
+        <span class="tag num" style="background: var(--color-neutral-800); color: var(--color-neutral-200);">{{ p.chartNo }}</span>
+      </div>
+      <div style="font-size: 12px; color: var(--color-neutral-400); display: flex; gap: var(--space-2);">
+        <span class="num">{{ p.visit }}</span><span>·</span><span>{{ p.site }}</span>
+      </div>
+    </div>
+
+    <div style="flex: 1; display: grid; grid-template-columns: repeat(6, 1fr); align-items: center;">
+      <sc-for list="{{ p.vitals }}" as="v" hint-placeholder-count="6">
+        <div style="padding: 0 var(--space-4); display: flex; flex-direction: column; gap: 1px;">
+          <span style="font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-500);">{{ v.k }}</span>
+          <span class="num" style="font-size: 16px; font-weight: 500; line-height: 1.25; color: var(--color-neutral-100);">{{ v.v }}</span>
+          <span style="font-size: 11px; line-height: 1.25; color: var(--c-warn);">{{ v.note }}</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-6) 0 var(--space-4);">
+      <span style="font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-500);">Demo<br>case</span>
+      <div class="seg" style="border-color: var(--color-divider);">
+        <sc-for list="{{ patientTabs }}" as="t" hint-placeholder-count="3">
+          <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <div style="grid-column: 1; grid-row: 2; display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); min-height: 0;">
+
+    <!-- 좌안(OS)이 화면 왼쪽, 우안(OD)이 오른쪽 — 패널 위치는 바꾸지 않는다.
+         사진만 .mirror 로 좌우반전해 보여준다. CAM 박스도 같은 래퍼 안에 있어 함께 반전되므로
+         병변 위치 정렬이 유지되고, AI 추정 오버레이 텍스트는 래퍼 밖이라 반전되지 않는다. -->
+    <div style="position: relative; background: var(--color-surface); border-radius: var(--radius-md); overflow: hidden; display: flex; flex-direction: column; min-width: 0;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) var(--space-4); flex-shrink: 0;">
+        <div style="display: flex; align-items: baseline; gap: var(--space-3); min-width: 0;">
+          <span style="font-family: var(--font-heading); font-weight: 500; font-size: 20px;">좌안</span>
+          <span class="tag" style="border: 1px solid var(--color-accent); color: var(--color-accent-300);">OS</span>
+          <span class="num" style="font-size: 11px; color: var(--color-neutral-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ p.os.file }}</span>
+          <span style="font-size: 11px; color: var(--color-neutral-400); white-space: nowrap;">화질 {{ p.os.quality }}</span>
+          <span class="num" style="font-size: 11px; color: var(--color-neutral-500); white-space: nowrap;">이웃 라벨 일치 {{ agreeOS }}</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;">
+          <button onClick="{{ toggleCam }}" style="{{ camBtnStyle }}">CAM</button>
+          <button onClick="{{ toggleOverlay }}" style="{{ ovBtnStyle }}">추정 표시</button>
+          <span style="font-size: 11px; color: var(--color-neutral-500); white-space: nowrap;">클릭 확대</span>
+        </div>
+      </div>
+      <div onClick="{{ openOS }}" style="position: relative; flex: 1; min-height: 0; overflow: hidden; cursor: zoom-in; background: var(--color-neutral-900);">
+        <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;">
+          <div class="lighten mirror" style="position: relative; height: 100%; aspect-ratio: 1;">
+            <img src="{{ p.os.img }}" alt="좌안 안저 영상" draggable="false" style="display: block; width: 100%; height: 100%; object-fit: cover;">
+            <div style="position: absolute; left: 28%; top: 32%; width: 30%; height: 26%; border: 1px solid var(--color-accent); border-radius: var(--radius-md); box-shadow: 0 0 30px var(--color-accent-700); opacity: {{ camOpacity }};"></div>
+          </div>
+        </div>
+        <div style="position: absolute; top: var(--space-4); right: var(--space-6); width: 224px; display: flex; flex-direction: column; gap: var(--space-2); pointer-events: none; opacity: {{ overlayOpacity }};">
+          <div class="onimg" style="font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-neutral-300);">AI 추정 · OS · 확진 아님</div>
+          <sc-for list="{{ p.os.preds }}" as="d" hint-placeholder-count="3">
+            <div class="onimg" style="display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); opacity: {{ d.dim }};">
+              <span style="font-size: 12px; color: var(--color-neutral-100);">{{ d.label }}</span>
+              <span class="num" style="font-family: var(--font-heading); font-weight: 500; font-size: 15px; line-height: 1; color: var(--color-accent-300);">{{ d.pctText }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div style="position: relative; background: var(--color-surface); border-radius: var(--radius-md); overflow: hidden; display: flex; flex-direction: column; min-width: 0;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) var(--space-4); flex-shrink: 0;">
+        <div style="display: flex; align-items: baseline; gap: var(--space-3); min-width: 0;">
+          <span style="font-family: var(--font-heading); font-weight: 500; font-size: 20px;">우안</span>
+          <span class="tag" style="border: 1px solid var(--color-accent); color: var(--color-accent-300);">OD</span>
+          <span class="num" style="font-size: 11px; color: var(--color-neutral-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ p.od.file }}</span>
+          <span style="font-size: 11px; color: var(--color-neutral-400); white-space: nowrap;">화질 {{ p.od.quality }}</span>
+          <span class="num" style="font-size: 11px; color: var(--color-neutral-500); white-space: nowrap;">이웃 라벨 일치 {{ agreeOD }}</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;">
+          <span style="font-size: 11px; color: var(--color-neutral-500); white-space: nowrap;">클릭 확대</span>
+        </div>
+      </div>
+      <div onClick="{{ openOD }}" style="position: relative; flex: 1; min-height: 0; overflow: hidden; cursor: zoom-in; background: var(--color-neutral-900);">
+        <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;">
+          <div class="lighten mirror" style="position: relative; height: 100%; aspect-ratio: 1;">
+            <img src="{{ p.od.img }}" alt="우안 안저 영상" draggable="false" style="display: block; width: 100%; height: 100%; object-fit: cover;">
+            <div style="position: absolute; right: 26%; top: 38%; width: 26%; height: 24%; border: 1px solid var(--color-accent); border-radius: var(--radius-md); box-shadow: 0 0 30px var(--color-accent-700); opacity: {{ camOpacity }};"></div>
+          </div>
+        </div>
+        <div style="position: absolute; top: var(--space-4); right: var(--space-6); width: 224px; display: flex; flex-direction: column; gap: var(--space-2); pointer-events: none; opacity: {{ overlayOpacity }};">
+          <div class="onimg" style="font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-neutral-300);">AI 추정 · OD · 확진 아님</div>
+          <sc-for list="{{ p.od.preds }}" as="d" hint-placeholder-count="3">
+            <div class="onimg" style="display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); opacity: {{ d.dim }};">
+              <span style="font-size: 12px; color: var(--color-neutral-100);">{{ d.label }}</span>
+              <span class="num" style="font-family: var(--font-heading); font-weight: 500; font-size: 15px; line-height: 1; color: var(--color-accent-300);">{{ d.pctText }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="grid-column: 1; grid-row: 3; display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--space-2); min-height: 0;">
+    <sc-for list="{{ simCases }}" as="c" hint-placeholder-count="6">
+      <button onClick="{{ c.onClick }}" style="position: relative; display: block; text-align: left; padding: 0; border: 1px solid var(--color-divider); border-radius: var(--radius-md); cursor: pointer; font-family: inherit; color: var(--color-text); background: var(--color-neutral-900); overflow: hidden; min-width: 0;" style-hover="border-color: var(--color-accent);">
+        <div class="lighten mirror" style="position: absolute; inset: 0;">
+          <img src="{{ c.img }}" alt="" draggable="false" style="display: block; width: 100%; height: 100%; object-fit: cover;">
+        </div>
+        <div style="position: relative; height: 100%; display: flex; flex-direction: column; justify-content: space-between; padding: var(--space-3) var(--space-4);">
+          <div class="onimg" style="display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2);">
+            <span style="font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-neutral-300);">{{ c.eyeCode }} 유사 {{ c.rank }}<span style="opacity: {{ c.matchDim }};"> · {{ c.match }}</span></span>
+            <span class="num" style="font-family: var(--font-heading); font-weight: 500; font-size: 20px; line-height: 1; color: var(--color-accent-300);">{{ c.sim }}</span>
+          </div>
+          <div class="onimg" style="display: flex; flex-direction: column; gap: 1px;">
+            <span style="font-size: 14px; line-height: 1.3; color: var(--color-neutral-100); text-wrap: pretty; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{ c.dx }}</span>
+            <span class="num" style="font-size: 11px; color: var(--color-neutral-300); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ c.id }} · {{ c.grade }}</span>
+          </div>
+        </div>
+      </button>
+    </sc-for>
+  </div>
+
+  <div style="grid-column: 2; grid-row: 1 / span 3; background: var(--color-surface); border-radius: var(--radius-md); display: flex; flex-direction: column; min-height: 0; overflow: hidden;">
+    <div style="padding: var(--space-4) var(--space-6) var(--space-3); flex-shrink: 0;">
+      <div style="font-family: var(--font-heading); font-weight: 500; font-size: 20px; letter-spacing: -0.015em;">임상 판단 보조 요약</div>
+      <div class="num" style="font-size: 11px; color: var(--color-neutral-400);">{{ modelTag }}</div>
+    </div>
+
+    <div style="flex: 1; overflow-y: auto; padding: 0 var(--space-6) var(--space-6); display: flex; flex-direction: column; gap: var(--space-8); min-height: 0;">
+
+      <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+        <div style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-500);">의심 소견 · 양안 전체</div>
+        <div style="font-size: 11px; line-height: 1.5; color: var(--color-neutral-500); text-wrap: pretty; margin-top: -4px;">한쪽 눈에만 나타난 소견도 전부 포함합니다. 복수 소견이 동반될 수 있으므로 순위와 무관하게 검토하세요.</div>
+        <sc-for list="{{ suspects }}" as="d" hint-placeholder-count="3">
+          <div style="display: flex; flex-direction: column; gap: var(--space-1);">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3);">
+              <span style="font-size: 15px; color: var(--color-neutral-100);">{{ d.label }}</span>
+              <span class="num" style="font-family: var(--font-heading); font-weight: 500; font-size: 16px; color: var(--color-neutral-100);">{{ d.pctText }}</span>
+            </div>
+            <div style="height: 4px; border-radius: var(--radius-sm); background: var(--color-neutral-800); overflow: hidden;">
+              <div style="height: 100%; width: {{ d.pctText }}; background: var(--color-accent-500);"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; gap: var(--space-3); font-size: 11px; color: var(--color-neutral-500);">
+              <span class="num">{{ d.eyes }}</span>
+              <span>{{ d.side }}</span>
+            </div>
+          </div>
+        </sc-for>
+        <div class="num" style="font-size: 11px; color: var(--color-neutral-500);">{{ normalLine }}</div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+        <div style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-500);">권장 협진 · 시급도</div>
+        <sc-for list="{{ referrals }}" as="r" hint-placeholder-count="2">
+          <div style="display: flex; flex-direction: column; gap: var(--space-1); background: var(--color-neutral-900); border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: var(--space-4); box-shadow: {{ r.mark }};">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);">
+              <span style="font-family: var(--font-heading); font-weight: 500; font-size: 17px;">{{ r.dept }}</span>
+              <span class="tag" style="{{ r.badgeStyle }}">{{ r.urgency }}</span>
+            </div>
+            <span style="font-size: 13px; line-height: 1.5; color: var(--color-neutral-300); text-wrap: pretty;">{{ r.reason }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+        <div style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-500);">추가 검사 권고</div>
+        <sc-for list="{{ tests }}" as="t" hint-placeholder-count="3">
+          <div style="display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-2) 0;">
+            <span class="tag num" style="flex-shrink: 0; background: var(--color-neutral-800); color: var(--color-neutral-300);">{{ t.code }}</span>
+            <div style="display: flex; flex-direction: column; min-width: 0;">
+              <span style="font-size: 14px; color: var(--color-neutral-100);">{{ t.name }}</span>
+              <span style="font-size: 12px; line-height: 1.45; color: var(--color-neutral-400); text-wrap: pretty;">{{ t.why }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+        <div style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-500);">전신질환 연관 경고</div>
+        <sc-for list="{{ systemic }}" as="s" hint-placeholder-count="2">
+          <div style="display: flex; flex-direction: column; gap: 2px; background: var(--color-neutral-900); border-radius: var(--radius-md); padding: var(--space-4);">
+            <span style="font-family: var(--font-heading); font-weight: 500; font-size: 14px; color: var(--color-neutral-100);">{{ s.title }}</span>
+            <span style="font-size: 12px; line-height: 1.5; color: var(--color-neutral-300); text-wrap: pretty;">{{ s.body }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+        <div style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-500);">환자 설명용 한 줄</div>
+        <div style="font-size: 14px; line-height: 1.6; color: var(--color-neutral-200); text-wrap: pretty; border-left: 2px solid var(--color-accent); padding-left: var(--space-4);">{{ patientLine }}</div>
+      </div>
+
+      <div style="font-size: 11px; line-height: 1.6; color: var(--color-neutral-500); text-wrap: pretty;">본 결과는 RFMiD 공개 데이터로 학습된 보조 도구의 통계적 추정치이며 진단이 아닙니다. 최종 판단은 의료진의 임상 소견에 따릅니다. 낮은 화질·산동 부족·주변부 미포함 영상에서는 신뢰도가 저하됩니다.</div>
+    </div>
+
+    <div style="display: flex; gap: var(--space-2); padding: var(--space-4) var(--space-6); flex-shrink: 0;">
+      <button class="btn btn-primary" onClick="{{ copySummary }}" style="flex: 1; padding: var(--space-3) var(--space-4);">{{ copyLabel }}</button>
+      <button class="btn btn-secondary" onClick="{{ doPrint }}" style="flex: 1; padding: var(--space-3) var(--space-4);">의뢰서 인쇄</button>
+    </div>
+  </div>
+
+  <sc-if value="{{ viewer }}" hint-placeholder-val="{{ false }}">
+    <div class="dialog-backdrop" onClick="{{ viewerBackdrop }}" style="z-index: 60; background: rgba(20, 22, 27, 0.82);">
+      <div class="dialog elev-lg" style="width: 1180px; max-width: 100%; gap: 0; padding: 0; overflow: hidden; background: var(--color-surface);">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); padding: var(--space-3) var(--space-6);">
+          <div style="display: flex; align-items: baseline; gap: var(--space-4); min-width: 0;">
+            <span style="font-family: var(--font-heading); font-weight: 500; font-size: 20px;">{{ viewer.label }}</span>
+            <span class="num" style="font-size: 12px; color: var(--color-neutral-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ viewer.file }}</span>
+            <span style="font-size: 12px; color: var(--color-neutral-400); white-space: nowrap;">화질 {{ viewer.quality }}</span>
+            <span class="num" style="font-size: 12px; color: var(--color-neutral-500); white-space: nowrap;">이웃 라벨 일치 {{ viewer.agree }}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: var(--space-3); flex-shrink: 0;">
+            <span style="font-size: 11px; color: var(--color-neutral-500);">휠 확대 · 드래그 이동</span>
+            <span class="num" style="font-size: 12px; color: var(--color-neutral-400); min-width: 38px; text-align: right;">{{ viewer.zoomLabel }}</span>
+            <button class="btn btn-secondary" onClick="{{ resetViewer }}" style="font-size: 12px; padding: var(--space-1) var(--space-3);">RESET</button>
+            <button class="btn btn-secondary" onClick="{{ closeViewer }}">닫기 ESC</button>
+          </div>
+        </div>
+        <div onWheel="{{ wheelViewer }}" onPointerDown="{{ dragViewer }}" style="position: relative; height: 782px; margin: 0 var(--space-2) var(--space-2); border-radius: var(--radius-md); overflow: hidden; cursor: grab; touch-action: none; background: var(--color-neutral-900);">
+          <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; transform: {{ viewer.tf }}; transform-origin: center center;">
+            <div class="lighten mirror" style="position: relative; height: 100%; aspect-ratio: 1;">
+              <img src="{{ viewer.img }}" alt="{{ viewer.label }} 안저 영상" draggable="false" style="display: block; width: 100%; height: 100%; object-fit: cover;">
+              <div style="position: absolute; {{ viewer.camBox }} border: 1px solid var(--color-accent); border-radius: var(--radius-md); box-shadow: 0 0 30px var(--color-accent-700); opacity: {{ camOpacity }};"></div>
+            </div>
+          </div>
+          <div style="position: absolute; top: var(--space-4); right: var(--space-6); width: 224px; display: flex; flex-direction: column; gap: var(--space-2); pointer-events: none; opacity: {{ overlayOpacity }};">
+            <div class="onimg" style="font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-neutral-300);">AI 추정 · {{ viewer.code }} · 확진 아님</div>
+            <sc-for list="{{ viewer.preds }}" as="d" hint-placeholder-count="3">
+              <div class="onimg" style="display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); opacity: {{ d.dim }};">
+                <span style="font-size: 12px; color: var(--color-neutral-100);">{{ d.label }}</span>
+                <span class="num" style="font-family: var(--font-heading); font-weight: 500; font-size: 15px; line-height: 1; color: var(--color-accent-300);">{{ d.pctText }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ compare }}" hint-placeholder-val="{{ false }}">
+    <div class="dialog-backdrop" onClick="{{ compareBackdrop }}" style="z-index: 50; background: rgba(20, 22, 27, 0.82);">
+      <div class="dialog elev-lg" style="width: 1420px; max-width: 100%; gap: 0; padding: 0; overflow: hidden; background: var(--color-surface);">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); padding: var(--space-3) var(--space-6);">
+          <div style="display: flex; align-items: baseline; gap: var(--space-4);">
+            <span style="font-family: var(--font-heading); font-weight: 500; font-size: 20px;">나란히 비교</span>
+            <span style="font-size: 14px; color: var(--color-neutral-300);">{{ compare.eyeLabel }}</span>
+          </div>
+          <button class="btn btn-secondary" onClick="{{ closeCompare }}">닫기 ESC</button>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); padding: 0 var(--space-2) var(--space-2);">
+          <div style="position: relative; height: 548px; background: var(--color-neutral-900); border-radius: var(--radius-md); overflow: hidden;">
+            <div class="lighten mirror" style="position: absolute; inset: 0;">
+              <img src="{{ compare.curImg }}" alt="" draggable="false" style="display: block; width: 100%; height: 100%; object-fit: contain;">
+            </div>
+            <div class="onimg" style="position: absolute; top: var(--space-4); left: var(--space-6); right: var(--space-6); display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4);">
+              <span style="font-family: var(--font-heading); font-weight: 500; font-size: 17px; color: var(--color-neutral-100);">현재 환자 · {{ compare.eyeCode }}</span>
+              <span class="num" style="font-size: 12px; color: var(--color-neutral-300);">{{ compare.curFile }}</span>
+            </div>
+            <div class="onimg" style="position: absolute; bottom: var(--space-4); left: var(--space-6); right: var(--space-6); font-size: 14px; color: var(--color-neutral-100);">AI 추정 1순위 · {{ compare.curDx }}</div>
+          </div>
+          <div style="position: relative; height: 548px; background: var(--color-neutral-900); border-radius: var(--radius-md); overflow: hidden;">
+            <div class="lighten mirror" style="position: absolute; inset: 0;">
+              <img src="{{ compare.img }}" alt="" draggable="false" style="display: block; width: 100%; height: 100%; object-fit: contain;">
+            </div>
+            <div class="onimg" style="position: absolute; top: var(--space-4); left: var(--space-6); right: var(--space-6); display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4);">
+              <span style="font-family: var(--font-heading); font-weight: 500; font-size: 17px; color: var(--color-neutral-100);">유사 학습 사례 {{ compare.rank }}</span>
+              <span class="num" style="font-size: 14px; color: var(--color-accent-300);">유사도 {{ compare.sim }}</span>
+            </div>
+            <div class="onimg" style="position: absolute; bottom: var(--space-4); left: var(--space-6); right: var(--space-6); font-size: 14px; color: var(--color-neutral-100);">확정 진단 · {{ compare.dx }} <span style="color: var(--color-neutral-300);">({{ compare.grade }} · {{ compare.id }})</span></div>
+          </div>
+        </div>
+        <div style="padding: var(--space-3) var(--space-6) var(--space-4); font-size: 13px; line-height: 1.55; color: var(--color-neutral-400); text-wrap: pretty;">{{ compare.note }}</div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1920,&quot;height&quot;:1080},&quot;modelTag&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;retina-cls v0.3 · TF.js · RFMiD {N,D,G,A,H,O}&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;모델&quot;}}">
+// 외부 모델 라벨셋 — 모델 출력 키와 1:1. 라벨 추가/변경 시 이 객체만 수정.
+const LABELS = {
+  N: '정상 (Normal)',
+  D: '당뇨망막병증 (DR)',
+  G: '녹내장 (Glaucoma)',
+  A: '황반변성 (AMD)',
+  H: '고혈압성 망막병증 (HR)',
+  O: '기타 이상 소견 (Others)'
+};
+
+// UI/UX 확인용 임시 이미지 — RFMiD 전처리본(512×512) 8장을 환자 3명에 공통으로 재사용한다.
+// 화면의 소견·유사도 값과는 아무 관계가 없다. 실제 구현에서는 환자별 촬영 영상과
+// 임베딩 이웃 검색 결과로 교체된다.
+const IMG = 'uploads/fundus/';
+const DEMO_IMG = {
+  os: IMG + '0_left.jpg',
+  od: IMG + '0_right.jpg',
+  simOS: [IMG + '1_left.jpg', IMG + '10_left.jpg', IMG + '100_left.jpg'],
+  simOD: [IMG + '1_right.jpg', IMG + '10_right.jpg', IMG + '100_right.jpg']
+};
+
+// 의심 소견으로 올릴 최소값. 이 값을 넘으면 한쪽 눈에만 나타났든 몇 개가 겹쳤든
+// 전부 목록에 올린다 — 단안 소견과 동반 소견을 순위로 눌러버리지 않는 것이 이 화면의 전제.
+const SUSPECT_MIN = 0.15;
+
+const PATIENTS = [
+  {
+    name: '김순자', ageSex: '68세 · 여', chartNo: 'DEMO-0421',
+    visit: '2026-07-29', site: '○○보건소 3차 순회 · 안저카메라 A',
+    vitals: [
+      { k: '체중 / BMI', v: '61 kg · 25.8', note: '' },
+      { k: '혈압', v: '148 / 92', note: '고혈압 범위' },
+      { k: 'HbA1c', v: '9.1 %', note: '6개월 미조절' },
+      { k: '기저질환', v: 'T2DM 12년, HTN', note: '' },
+      { k: '교정시력', v: 'OS 0.4 / OD 0.6', note: '' },
+      { k: '복용약', v: 'Metformin, Amlodipine', note: '' }
+    ],
+    os: { file: 'RFMiD_test_0421_OS.png', quality: '양호', preds: [['D', 0.87], ['H', 0.41], ['O', 0.19]] },
+    od: { file: 'RFMiD_test_0421_OD.png', quality: '보통 · 주변부 흐림', preds: [['D', 0.72], ['H', 0.38], ['N', 0.14]] },
+    simOS: [
+      { id: 'RFMiD_00318', code: 'D', dx: '중증 비증식 당뇨망막병증', grade: 'NPDR severe', sim: '94.2%' },
+      { id: 'RFMiD_01204', code: 'D', dx: '증식성 당뇨망막병증', grade: 'PDR', sim: '91.5%' },
+      { id: 'RFMiD_00877', code: 'D', dx: '당뇨망막병증 + 고혈압성 변화', grade: 'NPDR mod', sim: '88.7%' }
+    ],
+    simOD: [
+      { id: 'RFMiD_00742', code: 'D', dx: '중등도 비증식 당뇨망막병증', grade: 'NPDR mod', sim: '90.8%' },
+      { id: 'RFMiD_01455', code: 'D', dx: '당뇨망막병증 + 망막출혈', grade: 'NPDR mod', sim: '86.3%' },
+      { id: 'RFMiD_00095', code: 'H', dx: '고혈압성 망막병증', grade: 'HR grade 2', sim: '83.1%' }
+    ],
+    referrals: [
+      { dept: '안과 (Retina)', urgency: '즉시 · 72시간 내', reason: '양안 당뇨망막병증 소견, 좌안 신혈관 의심 영역 존재. 안저 정밀검사 및 범망막광응고(PRP) 판단 필요.' },
+      { dept: '내분비내과', urgency: '1주 내', reason: 'HbA1c 9.1%로 미조절. 혈당 조절 강화 없이는 망막병증 진행 위험 높음.' },
+      { dept: '심장내과 / 가정의학과', urgency: '1개월 내', reason: '혈압 148/92, 망막 혈관 협착 소견 동반. 고혈압 약제 조정 검토.' }
+    ],
+    tests: [
+      { code: 'OCT', name: '빛간섭단층촬영 (Macular OCT)', why: '당뇨성 망막부종(DME) 유무와 중심망막두께 확인' },
+      { code: 'FAG', name: '형광안저혈관조영', why: '신혈관 및 허혈 영역 범위 확인 — PRP 결정 근거' },
+      { code: 'IOP', name: '안압 측정', why: '녹내장 동반 확인 및 항VEGF 치료 전 기저값' },
+      { code: 'LAB', name: 'HbA1c · 소변알부민/크레아티닌비', why: '망막병증은 신병증과 동반 빈도 높음' }
+    ],
+    systemic: [
+      { title: '당뇨병 · 미세혈관 합병증 동반 가능', body: '망막 소견은 전신 미세혈관 손상의 창(window). 당뇨병성 신병증·말초신경병증 스크리닝 동시 진행 권고.' },
+      { title: '고혈압 · 뇌심혈관 위험', body: '망막 혈관 협착 + 혈압 148/92. 뇌졸중·허혈성 심질환 위험 평가(지질, 심전도) 함께 권고.' }
+    ],
+    patientLine: '양쪽 눈 혈관에 당뇨로 인한 변화가 보입니다. 지금은 시력이 크게 떨어지지 않았지만, 왼쪽 눈은 3일 안에 안과 진료가 필요합니다. 혈당 조절이 눈을 지키는 가장 중요한 치료입니다.'
+  },
+  {
+    name: '박정호', ageSex: '55세 · 남', chartNo: 'DEMO-0918',
+    visit: '2026-07-29', site: '○○보건소 3차 순회 · 안저카메라 A',
+    vitals: [
+      { k: '체중 / BMI', v: '78 kg · 26.4', note: '' },
+      { k: '혈압', v: '132 / 84', note: '' },
+      { k: 'HbA1c', v: '5.6 %', note: '' },
+      { k: '가족력', v: '녹내장 (부)', note: '고위험' },
+      { k: '교정시력', v: 'OS 0.9 / OD 1.0', note: '' },
+      { k: '복용약', v: '없음', note: '' }
+    ],
+    os: { file: 'RFMiD_test_0918_OS.png', quality: '양호', preds: [['G', 0.79], ['N', 0.16], ['O', 0.09]] },
+    od: { file: 'RFMiD_test_0918_OD.png', quality: '양호', preds: [['G', 0.52], ['N', 0.44], ['O', 0.08]] },
+    simOS: [
+      { id: 'RFMiD_00655', code: 'G', dx: '녹내장성 시신경 위축', grade: 'CDR 0.8', sim: '92.6%' },
+      { id: 'RFMiD_01130', code: 'G', dx: '녹내장 의심 · 시신경테 얇아짐', grade: 'CDR 0.7', sim: '89.4%' },
+      { id: 'RFMiD_00287', code: 'N', dx: '큰 생리적 시신경 함몰', grade: 'CDR 0.6', sim: '84.0%' }
+    ],
+    simOD: [
+      { id: 'RFMiD_00412', code: 'G', dx: '녹내장 의심', grade: 'CDR 0.6', sim: '85.7%' },
+      { id: 'RFMiD_00961', code: 'N', dx: '정상 시신경', grade: 'Normal', sim: '82.9%' },
+      { id: 'RFMiD_01377', code: 'O', dx: '근시성 시신경 변화', grade: 'Myopic', sim: '79.5%' }
+    ],
+    referrals: [
+      { dept: '안과 (Glaucoma)', urgency: '1주 내', reason: '좌안 시신경 함몰비 증가 소견. 안압·시야검사·OCT RNFL로 확진 필요. 가족력 있어 우선순위 상향.' },
+      { dept: '추적 관찰', urgency: '6개월 내 재촬영', reason: '우안은 경계선 소견(신뢰도 52%). 동일 조건 안저 재촬영으로 진행 여부 비교 권고.' }
+    ],
+    tests: [
+      { code: 'IOP', name: '안압 측정 (필수)', why: '녹내장 판단의 1차 지표 — 순회진료 현장에서 즉시 가능' },
+      { code: 'VF', name: '시야검사 (Humphrey)', why: '기능적 손상 범위 확인' },
+      { code: 'OCT', name: 'OCT RNFL · 시신경테 두께', why: '구조적 손상 정량화, 추적 기준값 확보' }
+    ],
+    systemic: [
+      { title: '가족력 기반 고위험군', body: '직계 가족 녹내장 병력은 발병 위험을 크게 높입니다. 형제·자녀 안압 검진 권고.' }
+    ],
+    patientLine: '왼쪽 눈 시신경 모양이 녹내장 초기와 비슷합니다. 녹내장은 증상 없이 진행되므로 1주 안에 안과에서 안압과 시야검사를 받아보시길 권합니다.'
+  },
+  {
+    name: '이말순', ageSex: '74세 · 여', chartNo: 'DEMO-1163',
+    visit: '2026-07-29', site: '○○보건소 3차 순회 · 안저카메라 A',
+    vitals: [
+      { k: '체중 / BMI', v: '52 kg · 22.1', note: '' },
+      { k: '혈압', v: '141 / 80', note: '' },
+      { k: 'HbA1c', v: '6.0 %', note: '' },
+      { k: '위험요인', v: '흡연 40갑년', note: 'AMD 위험' },
+      { k: '교정시력', v: 'OS 0.3 / OD 0.7', note: '좌안 왜곡 호소' },
+      { k: '복용약', v: 'NSAIDs', note: '' }
+    ],
+    os: { file: 'RFMiD_test_1163_OS.png', quality: '보통', preds: [['A', 0.83], ['O', 0.27], ['H', 0.12]] },
+    od: { file: 'RFMiD_test_1163_OD.png', quality: '양호', preds: [['A', 0.46], ['N', 0.39], ['H', 0.11]] },
+    simOS: [
+      { id: 'RFMiD_00524', code: 'A', dx: '습성 연령관련 황반변성', grade: 'wet AMD', sim: '93.8%' },
+      { id: 'RFMiD_01021', code: 'A', dx: '건성 AMD · 지도형 위축', grade: 'GA', sim: '90.1%' },
+      { id: 'RFMiD_00789', code: 'O', dx: '중심 망막정맥 폐쇄 후 변화', grade: 'CRVO late', sim: '81.4%' }
+    ],
+    simOD: [
+      { id: 'RFMiD_00190', code: 'A', dx: '중간 단계 건성 AMD', grade: 'drusen', sim: '87.2%' },
+      { id: 'RFMiD_01288', code: 'A', dx: '경도 드루젠', grade: 'early AMD', sim: '84.6%' },
+      { id: 'RFMiD_00603', code: 'N', dx: '정상 황반', grade: 'Normal', sim: '80.3%' }
+    ],
+    referrals: [
+      { dept: '안과 (Retina)', urgency: '즉시 · 48시간 내', reason: '좌안 습성 AMD 의심 + 중심 왜곡(변시증) 호소. 항VEGF 치료 시기가 시력 예후를 결정하므로 지체 없이 의뢰.' },
+      { dept: '금연 클리닉', urgency: '1개월 내', reason: '흡연은 AMD 진행의 최대 교정가능 위험인자. 40갑년 이력.' }
+    ],
+    tests: [
+      { code: 'OCT', name: '빛간섭단층촬영 (필수)', why: '망막하 액체·CNV 유무 — 항VEGF 적응증 판단' },
+      { code: 'AMSL', name: '암슬러 격자 자가검사', why: '현장에서 즉시 가능, 변시증 정량 기록' },
+      { code: 'FAG', name: '형광안저혈관조영', why: '신혈관막 위치와 유형 확인' }
+    ],
+    systemic: [
+      { title: '흡연 · 심혈관 위험 공유', body: 'AMD와 심혈관질환은 위험인자를 공유. 지질·혈압 관리 및 금연 상담 병행 권고.' },
+      { title: '시력 저하로 인한 낙상 위험', body: '74세, 좌안 교정시력 0.3. 가정 내 조명·문턱 점검 및 낙상 예방 교육 권고.' }
+    ],
+    patientLine: '왼쪽 눈 중심부(황반)에 노화로 인한 변화가 있고, 물이 찬 형태일 가능성이 있습니다. 이 경우 치료 시기가 시력을 좌우하므로 이틀 안에 안과 진료가 필요합니다.'
+  }
+];
+
+const EYE = { os: { label: '좌안 (OS)', code: 'OS' }, od: { label: '우안 (OD)', code: 'OD' } };
+
+class Component extends DCLogic {
+  state = {
+    idx: 0,
+    cam: false,
+    overlay: true,
+    z: { os: { s: 1, x: 0, y: 0 }, od: { s: 1, x: 0, y: 0 } },
+    viewer: null,
+    compare: null,
+    copied: false
+  };
+
+  componentDidMount() {
+    this._key = (e) => { if (e.key === 'Escape') this.setState({ compare: null, viewer: null }); };
+    window.addEventListener('keydown', this._key);
+  }
+  componentWillUnmount() { window.removeEventListener('keydown', this._key); }
+
+  setZ(eye, fn) {
+    this.setState(s => ({ z: Object.assign({}, s.z, { [eye]: fn(s.z[eye]) }) }));
+  }
+
+  wheel(eye) {
+    return (e) => {
+      e.preventDefault();
+      this.setZ(eye, z => {
+        const s = Math.min(6, Math.max(1, z.s * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+        return s === 1 ? { s: 1, x: 0, y: 0 } : { s: s, x: z.x, y: z.y };
+      });
+    };
+  }
+
+  drag(eye) {
+    return (e) => {
+      if (e.button !== 0) return;
+      const sx = e.clientX, sy = e.clientY;
+      const base = this.state.z[eye];
+      const move = (ev) => this.setZ(eye, () => ({ s: base.s, x: base.x + (ev.clientX - sx), y: base.y + (ev.clientY - sy) }));
+      const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    };
+  }
+
+  // 의심 소견 목록. 양안을 하나의 순위로 합치지 않고, 두 눈 중 어느 쪽이든
+  // SUSPECT_MIN 을 넘으면 전부 올린다 — 한쪽 눈에만 나타나는 소견이 있고,
+  // 복수 소견이 동반될 수 있으므로 1순위만 남기면 임상적으로 위험하다.
+  // 대표값은 평균이 아니라 max: 한쪽에서 강하게 보이면 그게 고려 대상이다.
+  suspects(p) {
+    const pct = (v) => Math.round(v * 100) + '%';
+    const at = (eye, code) => (p[eye].preds.find(d => d[0] === code) || [])[1] || 0;
+    const codes = [];
+    ['os', 'od'].forEach(eye => p[eye].preds.forEach(d => {
+      if (d[0] !== 'N' && codes.indexOf(d[0]) < 0) codes.push(d[0]);
+    }));
+    return codes.map(code => {
+      const os = at('os', code), od = at('od', code);
+      const hi = Math.max(os, od);
+      const both = os >= SUSPECT_MIN && od >= SUSPECT_MIN;
+      return {
+        code: code,
+        label: LABELS[code] || code,
+        hi: hi,
+        pctText: pct(hi),
+        eyes: 'OS ' + (os ? pct(os) : '—') + '   OD ' + (od ? pct(od) : '—'),
+        side: both ? '양안' : (os >= od ? '좌안 단독' : '우안 단독')
+      };
+    }).filter(d => d.hi >= SUSPECT_MIN).sort((a, b) => b.hi - a.hi);
+  }
+
+  // 정상 소견은 의심 목록의 경쟁자가 아니라 반대 근거로 따로 적는다.
+  normalLine(p) {
+    const at = (eye) => (p[eye].preds.find(d => d[0] === 'N') || [])[1];
+    const os = at('os'), od = at('od');
+    if (!os && !od) return '';
+    const pct = (v) => v ? Math.round(v * 100) + '%' : '—';
+    return '정상 소견 가능성 · OS ' + pct(os) + ' / OD ' + pct(od);
+  }
+
+  // 이웃 라벨 일치도 — 유사 사례 3장의 확정 진단이 그 눈의 1순위 추정과 몇 개 일치하는지.
+  // 임베딩 이웃이 엇갈리면 그 자체가 애매한 케이스라는 신호다.
+  agree(p, eye) {
+    const top = p[eye].preds[0][0];
+    const list = eye === 'os' ? p.simOS : p.simOD;
+    return list.filter(c => c.code === top).length + '/' + list.length;
+  }
+
+  // 사진 위 오버레이(.onimg)는 accent 단색 — 위험도를 색으로 말하는 건 사이드바 몫이다.
+  // 사진 위의 붉은 숫자는 확진처럼 읽히고, 유사사례 카드와도 색이 어긋난다.
+  // 중요도는 투명도로만, 그리고 순위가 아니라 값에 비례시킨다 —
+  // 순위 기반이면 0.52 / 0.44 처럼 근접한 값이 강/약으로 과장된다.
+  pred(list) {
+    return (list || []).map(([code, v]) => ({
+      code: code,
+      label: LABELS[code] || code,
+      dim: (0.42 + 0.58 * v).toFixed(2),
+      pctText: Math.round(v * 100) + '%'
+    }));
+  }
+
+  summaryText(p) {
+    return [
+      '[망막 영상 AI 판독 보조 요약 — 진단 아님]',
+      '환자: ' + p.name + ' (' + p.ageSex + ') / ' + p.chartNo + ' / ' + p.visit + ' ' + p.site,
+      '참고: ' + p.vitals.map(v => v.k + ' ' + v.v).join(' · '),
+      '',
+      '의심 소견 (양안 전체 — 한쪽 눈에만 나타난 소견도 포함):',
+      ...this.suspects(p).map(d => '  - ' + d.label + ' 최대 ' + d.pctText + ' [' + d.side + '] ' + d.eyes.replace(/\s+/g, ' ')),
+      '  ' + this.normalLine(p),
+      '좌안(OS) 1순위: ' + LABELS[p.os.preds[0][0]] + ' ' + Math.round(p.os.preds[0][1] * 100) + '% (화질 ' + p.os.quality + ', 이웃 라벨 일치 ' + this.agree(p, 'os') + ')',
+      '우안(OD) 1순위: ' + LABELS[p.od.preds[0][0]] + ' ' + Math.round(p.od.preds[0][1] * 100) + '% (화질 ' + p.od.quality + ', 이웃 라벨 일치 ' + this.agree(p, 'od') + ')',
+      '',
+      '권장 협진:',
+      ...p.referrals.map(r => '  - ' + r.dept + ' [' + r.urgency + '] ' + r.reason),
+      '',
+      '추가 검사 권고:',
+      ...p.tests.map(t => '  - ' + t.code + ' ' + t.name + ' — ' + t.why),
+      '',
+      '전신질환 연관:',
+      ...p.systemic.map(s => '  - ' + s.title + ': ' + s.body),
+      '',
+      '유사 학습 사례(OS): ' + p.simOS.map(c => c.id + ' ' + c.dx + ' ' + c.sim).join(' / '),
+      '유사 학습 사례(OD): ' + p.simOD.map(c => c.id + ' ' + c.dx + ' ' + c.sim).join(' / '),
+      '',
+      '※ RFMiD 공개 데이터 기반 보조 도구의 통계적 추정치. 확진은 안과 검사 필요.'
+    ].join('\n');
+  }
+
+  renderVals() {
+    const p = PATIENTS[this.state.idx] || PATIENTS[0];
+    const z = this.state.z;
+    const tf = (e) => 'translate(' + z[e].x + 'px, ' + z[e].y + 'px) scale(' + z[e].s + ')';
+
+    const simImg = (eye, i) => DEMO_IMG[eye === 'os' ? 'simOS' : 'simOD'][i];
+
+    const card = (eye) => (c, i) => Object.assign({}, c, {
+      rank: i + 1,
+      eyeCode: EYE[eye].code,
+      img: simImg(eye, i),
+      match: c.code === p[eye].preds[0][0] ? '라벨 일치' : '라벨 불일치',
+      matchDim: c.code === p[eye].preds[0][0] ? 1 : 0.55,
+      onClick: () => this.setState({
+        compare: Object.assign({}, c, {
+          rank: i + 1,
+          eyeLabel: EYE[eye].label,
+          eyeCode: EYE[eye].code,
+          img: simImg(eye, i),
+          curImg: DEMO_IMG[eye],
+          curFile: p[eye].file,
+          curDx: (LABELS[p[eye].preds[0][0]] || '') + ' ' + Math.round(p[eye].preds[0][1] * 100) + '%',
+          note: '이 학습 사례는 확정 진단된 영상입니다. 유사도 ' + c.sim + '는 모델 임베딩 공간상의 거리이며, 동일 진단을 의미하지 않습니다. 병변의 위치·범위·화질 차이를 직접 대조해 판단하세요.'
+        })
+      })
+    });
+
+    const chip = (on) => 'font-family: var(--font-heading); font-weight: 500; font-size: 12px; line-height: 1.2; padding: var(--space-1) var(--space-3); border-radius: var(--radius-md); cursor: pointer; background: transparent; border: 1px solid ' + (on
+      ? 'var(--color-accent); color: var(--color-accent-300);'
+      : 'var(--color-divider); color: var(--color-neutral-300);');
+
+    const v = this.state.viewer;
+    const viewer = v ? {
+      eye: v,
+      label: EYE[v].label,
+      code: EYE[v].code,
+      file: p[v].file,
+      quality: p[v].quality,
+      agree: this.agree(p, v),
+      preds: this.pred(p[v].preds),
+      img: DEMO_IMG[v],
+      tf: tf(v),
+      zoomLabel: z[v].s.toFixed(1) + '×',
+      // 인라인 패널의 CAM 박스와 같은 위치 — 실제 구현에서는 모델이 낸 좌표로 대체된다.
+      camBox: v === 'os'
+        ? 'left: 28%; top: 32%; width: 30%; height: 26%;'
+        : 'right: 26%; top: 38%; width: 26%; height: 24%;'
+    } : null;
+
+    return {
+      p: Object.assign({}, p, {
+        os: Object.assign({}, p.os, { preds: this.pred(p.os.preds), img: DEMO_IMG.os }),
+        od: Object.assign({}, p.od, { preds: this.pred(p.od.preds), img: DEMO_IMG.od })
+      }),
+      modelTag: this.props.modelTag ?? 'retina-cls v0.3 · TF.js · RFMiD {N,D,G,A,H,O}',
+      patientTabs: PATIENTS.map((q, i) => ({
+        label: q.name,
+        onClick: () => this.setState({ idx: i, compare: null, viewer: null, copied: false, z: { os: { s: 1, x: 0, y: 0 }, od: { s: 1, x: 0, y: 0 } } }),
+        style: 'font-family: var(--font-heading); font-weight: 500; font-size: 13px; padding: var(--space-2) var(--space-4); border: 0; background: transparent; cursor: pointer; ' + (i === this.state.idx
+          ? 'color: var(--color-accent-300); box-shadow: inset 0 0 0 1px var(--color-accent);'
+          : 'color: var(--color-neutral-300);')
+      })),
+      // 패널 순서(OS 왼쪽 / OD 오른쪽)와 같게 — 5~7번은 왼쪽 패널(OS), 8~10번은 오른쪽 패널(OD)의 이웃.
+      simCases: p.simOS.map(card('os')).concat(p.simOD.map(card('od'))),
+      suspects: this.suspects(p),
+      normalLine: this.normalLine(p),
+      agreeOS: this.agree(p, 'os'),
+      agreeOD: this.agree(p, 'od'),
+      // 시급도는 이 화면에서 채도를 쓰는 유일한 자리다. 3단(빨강/주황/파랑) 채움을
+      // 2단 선으로 줄였다 — 긴급만 색으로 표시하고, 나머지 단계는 문구가 이미 말한다.
+      referrals: p.referrals.map(r => {
+        const now = r.urgency.indexOf('즉시') === 0;
+        const col = now ? 'var(--c-danger)' : 'var(--color-neutral-600)';
+        return Object.assign({}, r, {
+          mark: 'inset 3px 0 0 ' + col,
+          badgeStyle: 'background: transparent; border: 1px solid ' + (now
+            ? 'color-mix(in srgb, var(--c-danger) 60%, transparent); color: var(--color-neutral-100);'
+            : 'var(--color-divider); color: var(--color-neutral-300);')
+        });
+      }),
+      tests: p.tests,
+      systemic: p.systemic,
+      patientLine: p.patientLine,
+      viewer: viewer,
+      openOS: () => this.setState({ viewer: 'os' }),
+      openOD: () => this.setState({ viewer: 'od' }),
+      // 백드롭 클릭만 닫는다. 가드가 없으면 확대 뷰 안에서 드래그해 팬하는 순간 닫힌다.
+      viewerBackdrop: (e) => { if (!e || e.target === e.currentTarget) this.setState({ viewer: null }); },
+      closeViewer: () => this.setState({ viewer: null }),
+      wheelViewer: v ? this.wheel(v) : null,
+      dragViewer: v ? this.drag(v) : null,
+      resetViewer: v ? () => this.setZ(v, () => ({ s: 1, x: 0, y: 0 })) : null,
+      camOpacity: this.state.cam ? 1 : 0,
+      toggleCam: () => this.setState(s => ({ cam: !s.cam })),
+      camBtnStyle: chip(this.state.cam),
+      overlayOpacity: this.state.overlay ? 0.92 : 0,
+      toggleOverlay: () => this.setState(s => ({ overlay: !s.overlay })),
+      ovBtnStyle: chip(this.state.overlay),
+      compare: this.state.compare,
+      compareBackdrop: (e) => { if (!e || e.target === e.currentTarget) this.setState({ compare: null }); },
+      closeCompare: () => this.setState({ compare: null }),
+      copyLabel: this.state.copied ? '복사 완료' : '소견 요약 복사',
+      copySummary: () => {
+        const t = this.summaryText(p);
+        const done = () => { this.setState({ copied: true }); setTimeout(() => this.setState({ copied: false }), 1800); };
+        if (navigator.clipboard) navigator.clipboard.writeText(t).then(done, done); else done();
+      },
+      doPrint: () => window.print()
+    };
+  }
+}
+</script>
+</body>
+</html>
