@@ -373,6 +373,96 @@ d_target_recall 0.95
 
 ---
 
+## 팀원 안내 — 모델을 새로 올릴 때
+
+모델을 학습해 교체하는 사람이 매번 밟아야 하는 절차입니다. **가중치와 계약을 다른 곳에 두므로 순서를 지켜야 짝이 맞습니다.**
+
+### 원칙 하나: `.onnx` 는 절대 커밋하지 않습니다
+
+`.gitignore` 가 `data/model*/*.onnx` 를 막아 두었습니다. 우회하지 마세요.
+
+가중치는 재학습마다 통째로 바뀌므로 git 에 넣으면 갈아탄 세대가 전부 히스토리에 영구히 남습니다 — 모델 2개 × 3세대면 약 170MB 이고, 이후 모든 클론과 Vercel 빌드가 그만큼 느려집니다. 지울 수도 없습니다(히스토리 재작성이 필요).
+
+Git LFS 도 답이 아닙니다. GitHub 무료 LFS 는 대역폭이 **월 1GB** 라 28MB 모델이면 방문 35회에 소진되고, **시연 도중에 모델 로딩이 끊깁니다.**
+
+### 1. Hugging Face 토큰 준비
+
+<https://huggingface.co/settings/tokens> → Token type 은 **Write** 를 고릅니다. Read 로는 업로드가 막힙니다.
+
+로그인은 **별도 터미널 창에서** 하세요.
+
+```
+hf auth login
+```
+
+> [!WARNING]
+> 토큰을 커밋·PR·이슈·채팅에 붙여넣지 마세요. 코드에도 넣지 않습니다 — 배포 페이지는 토큰이 필요 없습니다. 실수로 노출했다면 HF 설정에서 즉시 revoke 하세요.
+
+### 2. 업로드
+
+저장소는 **`HEROJ137/WINTER-retina-models`** 하나를 씁니다. 두 모델의 가중치가 여기 함께 들어갑니다.
+
+```
+hf upload HEROJ137/WINTER-retina-models <로컬 경로> <저장소 안 파일명> \
+  --commit-message "무엇을 바꿨는지"
+```
+
+> [!IMPORTANT]
+> **네임스페이스는 `HEROJ137` 입니다** — GitHub 사용자명(`jheroorehj`)이 아닙니다. 헷갈리면 `403 Forbidden: You don't have the rights to create a model under the namespace ...` 가 납니다. 본인 계정에서 작업한다면 `hf auth whoami` 로 확인한 이름을 쓰고, 팀 저장소에 올릴 권한을 받아 두세요.
+
+**저장소는 public 이어야 합니다.** 비공개면 브라우저가 토큰 없이 가중치를 받을 수 없고, 클라이언트 코드에 토큰을 넣는 것은 그 자체로 노출입니다.
+
+### 3. 계약 메타데이터를 같은 PR 에 커밋
+
+가중치만 바꾸고 끝내면 안 됩니다. 학습 스크립트가 새로 뱉은 메타데이터를 `data/model/`(1단계) 또는 `data/model-dr/`(2단계)에 덮어쓰고 **같은 PR 에 포함하세요.**
+
+| 파일 | 왜 코드와 함께 가야 하는가 |
+| --- | --- |
+| `*_postprocessing.json` | 클래스별 **temperature·threshold**. 이 값이 바뀌면 의심 소견 판정과 협진 시급도가 바뀝니다 — 화면 동작 변경입니다 |
+| `*_preprocessing.json` | 입력 규격. 학습 때와 하나라도 다르면 추론이 **조용히** 틀립니다(오류가 안 납니다) |
+| `*_labels.txt` | 출력 벡터 순서. `LABEL_ORDER` 와 1:1 이어야 합니다 |
+| `*_color_reference.json` | histogram match 기준값. 없으면 전처리를 재현할 수 없습니다 |
+| `manifest.json` | **외부 가중치의 무결성 기준.** 갱신하지 않으면 다음 사람의 SHA-256 대조가 실패합니다 |
+
+### 4. 검증 — PR 에 결과를 붙여 주세요
+
+토큰 없이(익명으로) 받아지는지, 받은 파일이 매니페스트와 같은지, 브라우저에서 fetch 되는지 세 가지를 확인합니다.
+
+```
+F=stage1_odir_convnextv2_tiny_int8.onnx        # 올린 파일명으로 바꾸세요
+U=https://huggingface.co/HEROJ137/WINTER-retina-models/resolve/main/$F
+
+curl -sL -o /tmp/dl -w "HTTP %{http_code} · %{size_download} bytes\n" "$U"
+shasum -a 256 /tmp/dl                          # manifest.json 의 sha256 과 대조
+curl -sIL "$U" | grep -i access-control-allow-origin   # * 가 나와야 합니다
+```
+
+`access-control-allow-origin: *` 가 안 나오면 브라우저에서 못 받습니다 — 저장소 공개 여부부터 확인하세요.
+
+### 5. 시연 직전에는 리비전을 고정합니다
+
+`resolve/main` 은 항상 최신을 가리킵니다. 시연 당일 누군가 모델을 올리면 **시연 중에 바뀝니다.** 시연 전날 `main` 을 커밋 해시로 바꿔 고정하세요.
+
+```
+.../resolve/542078159f5f4ab59a765b0a457af44ca3536da3/stage1_....onnx
+```
+
+### 브랜치 규칙
+
+`main` 에 직접 커밋하지 않습니다. `main` 에서 브랜치를 따고(`feat/...`, `fix/...`) PR 로 올립니다. `main` 이 Vercel 프로덕션 배포와 연결돼 있어 직접 커밋하면 검증 없이 배포됩니다.
+
+### 요약 체크리스트
+
+- [ ] `hf auth whoami` 로 네임스페이스 확인 (`HEROJ137`)
+- [ ] `hf upload` 로 가중치 업로드 — `.onnx` 는 커밋하지 않음
+- [ ] 저장소가 public 인지 확인
+- [ ] `manifest.json` + 전·후처리·라벨·color_reference 를 같은 PR 에 커밋
+- [ ] 익명 다운로드 · SHA-256 일치 · CORS `*` 세 가지 확인 결과를 PR 에 첨부
+- [ ] threshold 가 바뀌었으면 **화면 동작이 바뀐다**는 점을 PR 설명에 명시
+- [ ] 시연 전날 리비전 해시로 고정
+
+---
+
 ## 현재 상태
 
 - [x] 화면 설계 확정 (컴포넌트 1-10, 단일 데스크톱 화면)
