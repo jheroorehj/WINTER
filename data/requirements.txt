@@ -1,0 +1,12 @@
+# 파이썬 참조 구현(data/reference_infer.py)과 모델 검사용. 팀원 공통 환경.
+#     pip install -r data/requirements.txt
+#
+# 브라우저 쪽은 pip 로 관리하지 않는다. onnxruntime-web 은 CDN 에서 버전을 고정해
+# 불러오며(1.27.0), 프로토타입 HTML 의 <script src> 한 줄이 그 핀이다.
+#
+# 아래 버전은 실제로 동작을 확인한 조합이다. 상한을 걸어 둔 이유는 onnxruntime 이
+# 메이저 업데이트에서 int8 양자화 연산자 지원을 바꾼 이력이 있어서다.
+onnxruntime>=1.20,<2
+opencv-python>=4.8,<5
+numpy>=1.24,<3
+huggingface_hub>=0.24
