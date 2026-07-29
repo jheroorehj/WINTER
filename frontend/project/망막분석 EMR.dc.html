@@ -370,7 +370,23 @@ const IMG = '../../data/images/';
 // 그때까지 플레이스홀더를 쓴다.
 const NEIGHBOR_IMG = 'sample/';
 
-const LABEL_ORDER = ['N', 'D', 'G', 'A', 'H', 'O'];   // 모델 출력 순서와 1:1
+// ── 모델 계약 ────────────────────────────────────────────────────────────
+// 출력은 이 순서의 길이 6 확률 벡터다. 학습 시 클래스 순서를 여기와 반드시 맞춘다.
+const LABEL_ORDER = ['N', 'D', 'G', 'A', 'H', 'O'];
+
+// 다중라벨(multi-label)이다. 각 클래스 확률은 독립이며 합이 1이 아니다 —
+// 한 눈에 D 와 H 가 동시에 존재하는 케이스가 홀드아웃에 실제로 있다(예: OS H+O).
+// softmax 로 학습하면 확률이 서로를 밀어내 이 화면의 전제(소견 전부 나열)가 깨진다.
+// 반드시 클래스별 sigmoid + binary cross-entropy 로 학습할 것.
+const MODEL_MULTILABEL = true;
+
+// 전처리 규격. 학습 때 쓴 값과 하나라도 다르면 추론이 조용히 틀린다.
+const MODEL_INPUT = { size: 224, channels: 3, scale: 1 / 255, mean: null, std: null };
+
+// 모델 산출물 위치 (아직 없음). tf.loadLayersModel 이 model.json 과 같은
+// 디렉토리의 *.bin 샤드를 함께 읽는다.
+const MODEL_URL = '../../data/model/model.json';
+
 const SUSPECT_MIN = 0.15;
 
 // ==== GENERATED — 수정하지 마세요. `python3 data/build.py` 가 이 블록을 덮어씁니다. ====
@@ -453,30 +469,68 @@ const RULE_NORMAL = {
 };
 
 // ── 모델 연결 지점 ──────────────────────────────────────────────────────
-// predict(sc, eye) → [[코드, 확률], ...] 내림차순. 지금은 정답 라벨에서 만든 목업이며,
-// TF.js 추론이 준비되면 이 함수 하나만 교체한다. 화면 로직은 건드리지 않는다.
-//
-// 목업 규칙: 정답 라벨에 높은 값, 나머지에 낮은 값. 시나리오·눈·코드에서 만든
-// 결정적 해시로 흔들어 매번 같은 값이 나오게 한다(시연 재현성).
+// 실제 연결은 MODEL.load() 와 MODEL.infer() 두 곳만 채우면 된다.
+// 화면 로직은 vector() 가 돌려주는 길이 6 확률 벡터만 알면 되고, 그 아래는 모른다.
+const MODEL = {
+  status: 'mock',        // 'mock' | 'loading' | 'ready' | 'error'
+  net: null,
+
+  // 모델 준비. 실제 연결 시:
+  //   this.net = await tf.loadLayersModel(MODEL_URL);
+  //   await this.net.predict(tf.zeros([1, MODEL_INPUT.size, MODEL_INPUT.size, 3])).data();  // 워밍업
+  load: function () {
+    return Promise.resolve();          // 목업이라 로드할 것이 없다
+  },
+
+  // imgUrl → LABEL_ORDER 순서의 확률 배열(길이 6). 실제 연결 시:
+  //   const el = await loadImage(imgUrl);
+  //   const t = tf.tidy(() => tf.browser.fromPixels(el)
+  //       .resizeBilinear([MODEL_INPUT.size, MODEL_INPUT.size])
+  //       .toFloat().mul(MODEL_INPUT.scale).expandDims(0));
+  //   const out = await this.net.predict(t).data();  t.dispose();
+  //   return Array.from(out);          // sigmoid 출력, 합 != 1
+  //
+  // hint 는 목업 전용이다(정답 라벨). 실제 구현은 영상만 보고 무시해야 한다 —
+  // hint 를 참조하는 코드가 남으면 정답을 훔쳐보는 추론이 된다.
+  infer: function (imgUrl, hint) {
+    return Promise.resolve(mockVector(hint.labels, hint.seed));
+  }
+};
+
+// 목업 확률 벡터. 시나리오·눈·코드로 만든 결정적 해시라 매번 같은 값이 나온다(시연 재현성).
 function mockJitter(seed) {
   let h = 2166136261;
   for (let i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619); }
   return ((h >>> 0) % 1000) / 1000;
 }
 
-function predict(sc, eye) {
-  const truth = (sc.osLabels && eye === 'os' ? sc.osLabels : sc.odLabels || 'N').split('|');
+function mockVector(labels, seed) {
+  const truth = (labels || 'N').split('|');
   const hasDisease = truth.indexOf('N') < 0;
   return LABEL_ORDER.map(code => {
-    const j = mockJitter(sc.scenario_no + eye + code);
-    let p;
-    if (truth.indexOf(code) >= 0) p = code === 'N' ? 0.82 + j * 0.14 : 0.62 + j * 0.32;
-    else if (code === 'N') p = hasDisease ? 0.03 + j * 0.11 : 0.10 + j * 0.10;
+    const j = mockJitter(seed + code);
+    if (truth.indexOf(code) >= 0) return code === 'N' ? 0.82 + j * 0.14 : 0.62 + j * 0.32;
+    if (code === 'N') return hasDisease ? 0.03 + j * 0.11 : 0.10 + j * 0.10;
     // 오답은 SUSPECT_MIN 아래로 묶는다. 목업 잡음이 임계값을 넘으면 정상 환자에게도
     // 협진 권고가 붙어 이 도구의 전제(과경보 없음)가 무너진다.
-    else p = 0.01 + j * 0.10;
-    return [code, Math.round(p * 100) / 100];
-  }).sort((a, b) => b[1] - a[1]);   // 전체 클래스를 내림차순으로 — 자르기는 표시 단계에서
+    return 0.01 + j * 0.10;
+  });
+}
+
+// 확률 벡터 → 화면이 쓰는 [[코드, 확률], ...] 내림차순. 모델이 바뀌어도 이 어댑터는 그대로다.
+function toPairs(vec) {
+  return LABEL_ORDER
+    .map((code, i) => [code, Math.round((vec[i] || 0) * 100) / 100])
+    .sort((a, b) => b[1] - a[1]);
+}
+
+// 한 시나리오의 양안 추론. 비동기다 — 실제 모델은 동기로 호출할 수 없다.
+function inferScenario(sc) {
+  const one = (eye) => MODEL.infer(
+    IMG + sc[eye + 'Image'],
+    { labels: eye === 'os' ? sc.osLabels : sc.odLabels, seed: sc.scenario_no + eye }
+  ).then(toPairs);
+  return Promise.all([one('os'), one('od')]).then(r => ({ os: r[0], od: r[1] }));
 }
 
 // neighbors(sc, eye) → 유사 학습 사례. 임베딩 사전계산이 끝나면 kNN 결과로 교체한다.
@@ -490,9 +544,8 @@ const NEIGHBOR_DX = {
   N: ['정상 안저', '정상 안저 (렌즈 먼지)', '정상 시신경']
 };
 
-function neighbors(sc, eye) {
-  const preds = predict(sc, eye);
-  const top = preds[0][0];
+function neighbors(sc, eye, preds) {
+  const top = (preds && preds.length) ? preds[0][0] : 'N';
   const dxs = NEIGHBOR_DX[top] || NEIGHBOR_DX.O;
   const side = eye === 'os' ? 'os' : 'od';
   return dxs.map((dx, i) => ({
@@ -531,6 +584,9 @@ function clinical(sc, osPreds, odPreds) {
   });
   const codes = Object.keys(best).sort((a, b) => best[b] - best[a]);
 
+  if (!osPreds.length && !odPreds.length) {
+    return { referrals: [], tests: [], systemic: [] };   // 아직 추론 전
+  }
   if (!codes.length) {
     return { referrals: [Object.assign({}, RULE_NORMAL)], tests: [], systemic: [] };
   }
@@ -554,8 +610,10 @@ function clinical(sc, osPreds, odPreds) {
   return { referrals: referrals, tests: tests, systemic: systemic };
 }
 
-function buildPatient(sc) {
-  const osPreds = predict(sc, 'os'), odPreds = predict(sc, 'od');
+// preds 가 null 이면 아직 추론 전이다. 화면 구조는 유지하고 값만 비운다 —
+// 실제 모델은 로딩·추론에 시간이 걸리므로 이 상태가 반드시 존재한다.
+function buildPatient(sc, preds) {
+  const osPreds = (preds && preds.os) || [], odPreds = (preds && preds.od) || [];
   const cl = clinical(sc, osPreds, odPreds);
   return {
     name: sc.displayName, ageSex: sc.age + '세 · ' + (sc.sex === 'Male' ? '남' : '여'),
@@ -565,7 +623,7 @@ function buildPatient(sc) {
           preds: osPreds, img: IMG + sc.osImage },
     od: { file: sc.odSourceFile, quality: sc.odArtifact ? '보통 · ' + sc.odArtifact : '양호',
           preds: odPreds, img: IMG + sc.odImage },
-    simOS: neighbors(sc, 'os'), simOD: neighbors(sc, 'od'),
+    simOS: neighbors(sc, 'os', osPreds), simOD: neighbors(sc, 'od', odPreds),
     referrals: cl.referrals, tests: cl.tests, systemic: cl.systemic,
     patientLine: sc.patientLine
   };
@@ -582,19 +640,51 @@ class Component extends DCLogic {
     viewer: null,
     compare: null,
     copied: false,
-    scale: fitScale()
+    scale: fitScale(),
+    // 시나리오 번호 → { os: [[코드,확률],...], od: [...] }. 추론이 끝난 것만 들어온다.
+    preds: {},
+    modelStatus: MODEL.status,
+    modelError: ''
   };
 
   componentDidMount() {
+    this._alive = true;
     this._key = (e) => { if (e.key === 'Escape') this.setState({ compare: null, viewer: null }); };
     this._fit = () => this.setState({ scale: fitScale() });
     window.addEventListener('keydown', this._key);
     window.addEventListener('resize', this._fit);
     this._fit();
+
+    // 모델 로드 → 현재 시나리오 추론. 실제 모델은 여기서 수 초가 걸린다.
+    this.setState({ modelStatus: 'loading' });
+    MODEL.load().then(() => {
+      if (!this._alive) return;
+      MODEL.status = 'ready';
+      this.setState({ modelStatus: 'ready' });
+      this.infer(this.state.idx);
+    }, (e) => {
+      if (!this._alive) return;
+      MODEL.status = 'error';
+      this.setState({ modelStatus: 'error', modelError: String(e && e.message || e) });
+    });
   }
   componentWillUnmount() {
+    this._alive = false;
     window.removeEventListener('keydown', this._key);
     window.removeEventListener('resize', this._fit);
+  }
+
+  // 시나리오 하나를 추론해 상태에 넣는다. 이미 있으면 다시 하지 않는다.
+  infer(idx) {
+    const sc = SCENARIOS[idx];
+    if (!sc || this.state.preds[sc.scenario_no]) return;
+    inferScenario(sc).then((r) => {
+      if (!this._alive) return;
+      this.setState(st => ({ preds: Object.assign({}, st.preds, { [sc.scenario_no]: r }) }));
+    }, (e) => {
+      if (!this._alive) return;
+      this.setState({ modelStatus: 'error', modelError: String(e && e.message || e) });
+    });
   }
 
   setZ(eye, fn) {
@@ -715,7 +805,8 @@ class Component extends DCLogic {
 
   renderVals() {
     const sc = SCENARIOS[this.state.idx] || SCENARIOS[0];
-    const p = buildPatient(sc);
+    const preds = this.state.preds[sc.scenario_no] || null;
+    const p = buildPatient(sc, preds);
     const z = this.state.z;
     const tf = (e) => 'translate(' + z[e].x + 'px, ' + z[e].y + 'px) scale(' + z[e].s + ')';
 
@@ -767,11 +858,18 @@ class Component extends DCLogic {
         os: Object.assign({}, p.os, { preds: this.pred(p.os.preds) }),
         od: Object.assign({}, p.od, { preds: this.pred(p.od.preds) })
       }),
-      modelTag: this.props.modelTag ?? ('목업 추정 · 모델 미연결 · 라벨셋 {' + LABEL_ORDER.join(',') + '}'),
+      modelTag: this.props.modelTag ?? (function (st) {
+        const set = ' · 라벨셋 {' + LABEL_ORDER.join(',') + '}';
+        if (st.modelStatus === 'error') return '모델 오류 — ' + st.modelError;
+        if (st.modelStatus === 'loading') return '모델 로딩 중' + set;
+        if (!preds) return '추정 중' + set;
+        return (MODEL.status === 'mock' || MODEL.status === 'ready' && !MODEL.net
+                ? '목업 추정 · 모델 미연결' : 'retina-cls · TF.js') + set;
+      })(this.state),
       patientTabs: SCENARIOS.map((q, i) => ({
         label: q.displayName,
         title: q.scenario_no + '. ' + q.scenario_name,
-        onClick: () => this.setState({ idx: i, compare: null, viewer: null, copied: false, z: { os: { s: 1, x: 0, y: 0 }, od: { s: 1, x: 0, y: 0 } } }),
+        onClick: () => { this.setState({ idx: i, compare: null, viewer: null, copied: false, z: { os: { s: 1, x: 0, y: 0 }, od: { s: 1, x: 0, y: 0 } } }); this.infer(i); },
         style: 'font-family: var(--font-heading); font-weight: 500; font-size: 13px; padding: var(--space-2) var(--space-4); border: 0; background: transparent; cursor: pointer; ' + (i === this.state.idx
           ? 'color: var(--color-accent-300); box-shadow: inset 0 0 0 1px var(--color-accent);'
           : 'color: var(--color-neutral-300);')
