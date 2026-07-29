@@ -79,13 +79,15 @@
       </sc-for>
     </div>
 
-    <div style="display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-6) 0 var(--space-4);">
+    <!-- 시나리오가 늘어도 헤더 폭이 흔들리지 않게 트리거는 고정폭이다.
+         목록은 아래 sc-if 에서 fixed 로 띄운다 — 이 셀에 overflow: hidden 이 있어
+         absolute 로는 잘린다. 캔버스에 transform 이 걸려 있으므로 fixed 의 기준은 캔버스다. -->
+    <div style="display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-6) 0 var(--space-4); flex-shrink: 0;">
       <span style="font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-500);">Demo<br>case</span>
-      <div class="seg" style="border-color: var(--color-divider);">
-        <sc-for list="{{ patientTabs }}" as="t" hint-placeholder-count="3">
-          <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
-        </sc-for>
-      </div>
+      <button onClick="{{ togglePicker }}" style="{{ pickerBtnStyle }}">
+        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ pickerLabel }}</span>
+        <span class="num" style="flex-shrink: 0; color: var(--color-neutral-400); font-size: 11px;">{{ pickerCount }}</span>
+      </button>
     </div>
   </div>
 
@@ -259,6 +261,23 @@
       <button class="btn btn-secondary" onClick="{{ doPrint }}" style="flex: 1; padding: var(--space-3) var(--space-4);">의뢰서 인쇄</button>
     </div>
   </div>
+
+  <sc-if value="{{ picker }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closePicker }}" style="position: fixed; inset: 0; z-index: 40;"></div>
+    <div style="position: fixed; top: 90px; right: 468px; width: 384px; max-height: 640px; overflow-y: auto; z-index: 41; background: var(--color-surface); border: 1px solid var(--color-divider); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); padding: var(--space-2);">
+      <div style="padding: var(--space-2) var(--space-3) var(--space-3); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-500);">시연 케이스 {{ pickerCount }}</div>
+      <sc-for list="{{ caseList }}" as="t" hint-placeholder-count="7">
+        <button onClick="{{ t.onClick }}" style="{{ t.rowStyle }}">
+          <span class="tag num" style="{{ t.chipStyle }}">{{ t.no }}</span>
+          <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; text-align: left;">
+            <span style="font-size: 14px; color: var(--color-neutral-100); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ t.scenario }}</span>
+            <span class="num" style="font-size: 11px; color: var(--color-neutral-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ t.patient }}</span>
+          </span>
+          <span class="num" style="flex-shrink: 0; font-size: 11px; color: var(--color-neutral-400); text-align: right;">{{ t.labels }}</span>
+        </button>
+      </sc-for>
+    </div>
+  </sc-if>
 
   <sc-if value="{{ viewer }}" hint-placeholder-val="{{ false }}">
     <div class="dialog-backdrop" onClick="{{ viewerBackdrop }}" style="z-index: 60; background: rgba(20, 22, 27, 0.82);">
@@ -637,6 +656,7 @@ class Component extends DCLogic {
     cam: false,
     overlay: true,
     z: { os: { s: 1, x: 0, y: 0 }, od: { s: 1, x: 0, y: 0 } },
+    picker: false,
     viewer: null,
     compare: null,
     copied: false,
@@ -649,7 +669,7 @@ class Component extends DCLogic {
 
   componentDidMount() {
     this._alive = true;
-    this._key = (e) => { if (e.key === 'Escape') this.setState({ compare: null, viewer: null }); };
+    this._key = (e) => { if (e.key === 'Escape') this.setState({ compare: null, viewer: null, picker: false }); };
     this._fit = () => this.setState({ scale: fitScale() });
     window.addEventListener('keydown', this._key);
     window.addEventListener('resize', this._fit);
@@ -866,14 +886,40 @@ class Component extends DCLogic {
         return (MODEL.status === 'mock' || MODEL.status === 'ready' && !MODEL.net
                 ? '목업 추정 · 모델 미연결' : 'retina-cls · TF.js') + set;
       })(this.state),
-      patientTabs: SCENARIOS.map((q, i) => ({
-        label: q.displayName,
-        title: q.scenario_no + '. ' + q.scenario_name,
-        onClick: () => { this.setState({ idx: i, compare: null, viewer: null, copied: false, z: { os: { s: 1, x: 0, y: 0 }, od: { s: 1, x: 0, y: 0 } } }); this.infer(i); },
-        style: 'font-family: var(--font-heading); font-weight: 500; font-size: 13px; padding: var(--space-2) var(--space-4); border: 0; background: transparent; cursor: pointer; ' + (i === this.state.idx
-          ? 'color: var(--color-accent-300); box-shadow: inset 0 0 0 1px var(--color-accent);'
-          : 'color: var(--color-neutral-300);')
-      })),
+      picker: this.state.picker,
+      togglePicker: () => this.setState(st => ({ picker: !st.picker })),
+      closePicker: (e) => { if (!e || e.target === e.currentTarget) this.setState({ picker: false }); },
+      pickerLabel: sc.scenario_name,
+      pickerCount: (this.state.idx + 1) + ' / ' + SCENARIOS.length,
+      pickerBtnStyle: 'display: flex; align-items: center; gap: var(--space-3); width: 236px; '
+        + 'font-family: var(--font-heading); font-weight: 500; font-size: 13px; text-align: left; '
+        + 'padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); cursor: pointer; '
+        + 'background: transparent; border: 1px solid '
+        + (this.state.picker ? 'var(--color-accent); color: var(--color-accent-300);'
+                             : 'var(--color-divider); color: var(--color-neutral-200);'),
+      caseList: SCENARIOS.map((q, i) => {
+        const on = i === this.state.idx;
+        const codes = (a) => a.split('|').join('·');
+        return {
+          no: q.scenario_no,
+          scenario: q.scenario_name,
+          patient: q.displayName + ' · ' + q.age + '세 · ' + (q.sex === 'Male' ? '남' : '여')
+                   + (q.demo_primary ? ' · 라이브' : ''),
+          labels: 'OS ' + codes(q.osLabels) + '   OD ' + codes(q.odLabels),
+          chipStyle: 'flex-shrink: 0; min-width: 22px; justify-content: center; padding: 2px 6px; '
+            + (on ? 'background: var(--color-accent); color: #1E1E1E;'
+                  : 'background: var(--color-neutral-800); color: var(--color-neutral-300);'),
+          rowStyle: 'display: flex; align-items: center; gap: var(--space-3); width: 100%; '
+            + 'padding: var(--space-3); border: 0; border-radius: var(--radius-md); cursor: pointer; '
+            + 'font-family: inherit; text-align: left; background: '
+            + (on ? 'color-mix(in srgb, var(--color-accent) 14%, transparent);' : 'transparent;'),
+          onClick: () => {
+            this.setState({ idx: i, picker: false, compare: null, viewer: null, copied: false,
+                            z: { os: { s: 1, x: 0, y: 0 }, od: { s: 1, x: 0, y: 0 } } });
+            this.infer(i);
+          }
+        };
+      }),
       // 패널 순서(OS 왼쪽 / OD 오른쪽)와 같게 — 5-7번은 왼쪽 패널(OS), 8-10번은 오른쪽 패널(OD)의 이웃.
       simCases: p.simOS.map(card('os')).concat(p.simOD.map(card('od'))),
       suspects: this.suspects(p),
