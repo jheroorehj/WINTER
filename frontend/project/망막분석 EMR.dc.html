@@ -349,12 +349,12 @@ const LABELS = {
 // UI/UX 확인용 임시 이미지 — RFMiD 전처리본(512×512) 8장을 환자 3명에 공통으로 재사용한다.
 // 화면의 소견·유사도 값과는 아무 관계가 없다. 실제 구현에서는 환자별 촬영 영상과
 // 임베딩 이웃 검색 결과로 교체된다.
-const IMG = 'uploads/fundus/';
+const IMG = 'sample/';
 const DEMO_IMG = {
-  os: IMG + '0_left.jpg',
-  od: IMG + '0_right.jpg',
-  simOS: [IMG + '1_left.jpg', IMG + '10_left.jpg', IMG + '100_left.jpg'],
-  simOD: [IMG + '1_right.jpg', IMG + '10_right.jpg', IMG + '100_right.jpg']
+  os: IMG + 'patient-os.jpg',
+  od: IMG + 'patient-od.jpg',
+  simOS: [IMG + 'similar-os-1.jpg', IMG + 'similar-os-2.jpg', IMG + 'similar-os-3.jpg'],
+  simOD: [IMG + 'similar-od-1.jpg', IMG + 'similar-od-2.jpg', IMG + 'similar-od-3.jpg']
 };
 
 // 의심 소견으로 올릴 최소값. 이 값을 넘으면 한쪽 눈에만 나타났든 몇 개가 겹쳤든

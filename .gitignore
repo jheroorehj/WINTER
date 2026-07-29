@@ -2,9 +2,8 @@
 # 원본 데이터셋과 전처리 산출물. 용량이 크고 재배포 조건 확인이 끝나지 않았다.
 archive/
 
-# 프로토타입 화면 확인용으로 데이터셋에서 복사해 둔 안저 샘플.
-# 로컬에서만 두고 쓴다 — 복원 방법은 README 의 "데모 이미지" 항목 참고.
-frontend/project/uploads/fundus/
+# 화면 확인용 샘플 8장은 frontend/project/sample/ 에 커밋한다(재배포 조건은 미확정 —
+# frontend/project/sample/README.md 참고). 원본 데이터셋만 제외한다.
 
 # ── OS / 편집기 ──────────────────────────────────────────────────
 .DS_Store

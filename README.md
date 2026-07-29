@@ -76,7 +76,8 @@ WINTER/
 │     ├─ 망막분석 EMR.dc.html          ★ 주 설계 파일 (프로토타입 + 로직)
 │     ├─ support.js                   프로토타입 런타임 (x-dc)
 │     ├─ _ds/nocturne-…/              디자인 시스템 (styles.css + 가이드)
-│     └─ uploads/                     와이어프레임, 데모 이미지
+│     ├─ sample/                      화면 확인용 안저 샘플 8장 + 출처 안내
+│     └─ uploads/                     와이어프레임
 └─ docs/
    ├─ UI_컴포넌트.jpeg                 손그림 와이어프레임 (컴포넌트 1-10)
    ├─ WINTER.png / WINTER 2.png       로고
@@ -85,18 +86,19 @@ WINTER/
 
 `망막분석 EMR.dc.html` 은 **프로덕션 코드가 아니라 디자인 프로토타입**입니다. `<sc-for>`, `{{ }}` 바인딩, `DCLogic` 은 `support.js` 전용 문법이므로, 실제 구현은 이 화면의 시각적 출력과 동작을 기준으로 정적 HTML/CSS/JS 로 다시 작성합니다.
 
-### 데모 이미지
+### 샘플 안저 영상
 
-프로토타입 화면 확인용 안저 샘플 8장은 데이터셋에서 복사해 쓰는 것이라 저장소에 포함하지 않습니다(`.gitignore`). 로컬에서 화면을 보려면 데이터셋에서 8장을 아래 경로에 넣으면 됩니다.
+화면 확인용 8장을 `frontend/project/sample/` 에 포함했습니다. 파일명은 원본 데이터셋의 레코드 식별자 대신 화면상 역할을 씁니다.
 
 ```
-frontend/project/uploads/fundus/
-  0_left.jpg   0_right.jpg        ← 3·4번 현재 환자 좌/우안
-  1_left.jpg   10_left.jpg   100_left.jpg     ← 5·6·7번 좌안 유사 사례
-  1_right.jpg  10_right.jpg  100_right.jpg    ← 8·9·10번 우안 유사 사례
+frontend/project/sample/
+  patient-os.jpg                                      ← 3번 현재 환자 좌안
+  patient-od.jpg                                      ← 4번 현재 환자 우안
+  similar-os-1.jpg  similar-os-2.jpg  similar-os-3.jpg  ← 5·6·7번 좌안 유사 사례
+  similar-od-1.jpg  similar-od-2.jpg  similar-od-3.jpg  ← 8·9·10번 우안 유사 사례
 ```
 
-경로와 파일명은 `망막분석 EMR.dc.html` 상단의 `DEMO_IMG` 한 곳에만 정의돼 있습니다.
+**화면의 소견·유사도 수치와는 관계가 없습니다.** 레이아웃 확인용이며, 목업 환자 3명이 같은 8장을 공유하므로 케이스를 전환해도 사진은 바뀌지 않습니다. 경로는 `망막분석 EMR.dc.html` 의 `DEMO_IMG` 한 곳에만 정의돼 있습니다. 출처와 재배포 조건은 `frontend/project/sample/README.md` 를 보세요.
 
 ---
 
@@ -108,7 +110,7 @@ frontend/project/uploads/fundus/
 > 학습에 쓸 데이터셋을 확정한 뒤, 아래를 화면과 이 문서에 함께 반영해야 합니다.
 >
 > - 데이터셋 이름과 출처 URL
-> - 라이선스와 재배포 조건 (샘플 영상을 저장소에 넣을지 여부가 여기서 갈립니다)
+> - 라이선스와 재배포 조건 — `frontend/project/sample/` 의 8장이 공개 배포 중이므로, 조건이 맞지 않으면 제외해야 합니다
 > - 클래스 정의 (`C`=백내장, `M`=근시 를 포함할지 — 현재 화면의 라벨셋은 6개입니다)
 > - 홀드아웃 분할 방식
 
