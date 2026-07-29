@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./WINTER.png" alt="WINTER — Wide Imaging Network for Targeting Eye Retinopathy" width="760">
+  <img src="./docs/WINTER.png" alt="WINTER — Wide Imaging Network for Targeting Eye Retinopathy" width="760">
 </p>
 
 # WINTER
@@ -41,7 +41,7 @@
 데스크톱(1920×1080) 단일 화면 EMR 입니다.
 
 <p align="center">
-  <img src="./UI_%EC%BB%B4%ED%8F%AC%EB%84%8C%ED%8A%B8.jpeg" alt="WINTER 화면 구성 와이어프레임 — 컴포넌트 1-10" width="880">
+  <img src="./docs/UI_%EC%BB%B4%ED%8F%AC%EB%84%8C%ED%8A%B8.jpeg" alt="WINTER 화면 구성 와이어프레임 — 컴포넌트 1-10" width="880">
 </p>
 
 - **1** — 환자명, 나이·성별, 차트번호, 그리고 판단에 필요한 참고 수치만 선별 표시(혈압·HbA1c·기저질환·교정시력 등).
@@ -76,9 +76,10 @@ WINTER/
 │     ├─ support.js                   프로토타입 런타임 (x-dc)
 │     ├─ _ds/nocturne-…/              디자인 시스템 (styles.css + 가이드)
 │     └─ uploads/                     와이어프레임, 데모 이미지
-├─ UI_컴포넌트.jpeg                    손그림 와이어프레임 (컴포넌트 1-10)
-├─ WINTER.png / WINTER 2.png          로고
-└─ 의료진용 …-handoff.zip              원본 핸드오프 번들 (출처 보존용)
+└─ docs/
+   ├─ UI_컴포넌트.jpeg                 손그림 와이어프레임 (컴포넌트 1-10)
+   ├─ WINTER.png / WINTER 2.png       로고
+   └─ 의료진용 …-handoff.zip           원본 핸드오프 번들 (출처 보존용)
 ```
 
 `망막분석 EMR.dc.html` 은 **프로덕션 코드가 아니라 디자인 프로토타입**입니다. `<sc-for>`, `{{ }}` 바인딩, `DCLogic` 은 `support.js` 전용 문법이므로, 실제 구현은 이 화면의 시각적 출력과 동작을 기준으로 정적 HTML/CSS/JS 로 다시 작성합니다.
