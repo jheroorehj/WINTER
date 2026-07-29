@@ -69,6 +69,7 @@
 
 ```
 WINTER/
+├─ index.html                        배포 진입점 (프로토타입으로 연결)
 ├─ frontend/
 │  ├─ README.md                      코딩 에이전트용 핸드오프 안내
 │  └─ project/
@@ -125,7 +126,8 @@ frontend/project/uploads/fundus/
 - [ ] 모델 학습 · TensorFlow.js 변환
 - [ ] 임베딩 사전 계산 및 유사 사례 검색 연결
 - [ ] 정적 HTML/CSS/JS 구현
-- [ ] Vercel 배포
+- [x] Vercel 테스트 배포 (진입점 `index.html`, 안저 영상 미포함 — 레이아웃 확인용)
+- [ ] Vercel 프로덕션 배포
 
 ---
 

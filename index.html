@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WINTER — Wide Imaging Network for Targeting Eye Retinopathy</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Noto+Sans+KR:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --font: "Inter", "Noto Sans KR", system-ui, sans-serif;
+    --bg: #23272F;
+    --surface: #2B2F36;
+    --text: #F3F4F6;
+    --muted: #B0B8C4;
+    --dim: #8F98A6;
+    --faint: #6E7683;
+    --line: rgba(243, 244, 246, 0.14);
+    --accent: #3B82F6;
+    --accent-300: #93C0FC;
+    --warn: #F59E0B;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: var(--font); -webkit-font-smoothing: antialiased;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 48px 24px;
+  }
+  main { width: 100%; max-width: 660px; }
+  .logo { display: block; width: 100%; max-width: 420px; height: auto; margin-bottom: 28px; }
+  h1 { margin: 0; font-size: 15px; font-weight: 500; letter-spacing: 0.02em; color: var(--muted); }
+  .full { margin: 4px 0 0; font-size: 13px; color: var(--faint); }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 24px 0 0; }
+  .badge {
+    font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 4px 9px; border-radius: 8px; border: 1px solid var(--line); color: var(--dim);
+  }
+  p { margin: 20px 0 0; font-size: 14px; line-height: 1.65; color: var(--muted); text-wrap: pretty; }
+  .note {
+    margin-top: 28px; padding: 14px 16px; border-radius: 8px;
+    background: var(--surface); border: 1px solid var(--line);
+    font-size: 13px; line-height: 1.6; color: var(--dim); text-wrap: pretty;
+  }
+  .note strong { color: var(--text); font-weight: 500; }
+  .note + .note { margin-top: 8px; }
+  .warn { box-shadow: inset 3px 0 0 var(--warn); }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
+  a.btn {
+    font-size: 13px; font-weight: 500; text-decoration: none;
+    padding: 10px 16px; border-radius: 8px; border: 1px solid var(--line); color: var(--muted);
+    transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+  }
+  a.btn:hover { background: rgba(243, 244, 246, 0.07); color: var(--text); }
+  a.btn-primary { border-color: var(--accent); color: var(--accent-300); }
+  a.btn-primary:hover { background: rgba(59, 130, 246, 0.12); color: var(--accent-300); }
+  a.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  footer { margin-top: 36px; font-size: 11px; line-height: 1.7; color: var(--faint); text-wrap: pretty; }
+</style>
+</head>
+<body>
+<main>
+  <img class="logo" src="./docs/WINTER.png" alt="WINTER">
+
+  <h1>Wide Imaging Network for Targeting Eye Retinopathy</h1>
+  <p class="full">안저 사진 기반 임상 판단 보조 도구 — 안과 전문의가 아닌 의료진을 위한 설계</p>
+
+  <div class="badges">
+    <span class="badge">설계 프로토타입</span>
+    <span class="badge">모델 미연결</span>
+    <span class="badge">레이아웃 확인용 배포</span>
+  </div>
+
+  <p>
+    아래 화면은 컴포넌트 배치와 인터랙션을 확인하기 위한 <strong>디자인 프로토타입</strong>입니다.
+    표시되는 수치는 전부 시연용 목업이며, 학습된 모델이 낸 값이 아닙니다.
+  </p>
+
+  <div class="actions">
+    <a class="btn btn-primary" href="./frontend/project/%EB%A7%9D%EB%A7%89%EB%B6%84%EC%84%9D%20EMR.dc.html">프로토타입 열기</a>
+    <a class="btn" href="https://github.com/jheroorehj/WINTER">GitHub</a>
+  </div>
+
+  <div class="note warn">
+    <strong>이 배포에는 안저 영상이 포함되지 않았습니다.</strong>
+    데이터셋 재배포 조건이 확정되지 않아 샘플 이미지를 저장소에서 제외했습니다.
+    사진 영역 8곳은 빈 상태로 보이며, 레이아웃·오버레이·인터랙션 확인이 이 배포의 목적입니다.
+  </div>
+
+  <div class="note">
+    프로토타입은 <strong>1920×1080 고정 캔버스</strong>로 설계돼 있습니다. 더 작은 화면에서는 잘려 보입니다.
+    React와 컴파일러를 실행 시점에 CDN에서 받아오므로 첫 로딩이 몇 초 걸릴 수 있습니다.
+  </div>
+
+  <footer>
+    이 도구는 진단 기기가 아닙니다. 화면의 값은 통계적 추정치이며 확진이 아니고,
+    최종 판단은 의료진의 임상 소견에 따릅니다. 목업 환자는 시연용 가상 인물이며 실제 환자가 아닙니다.
+  </footer>
+</main>
+</body>
+</html>
