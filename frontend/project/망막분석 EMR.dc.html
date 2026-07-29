@@ -54,7 +54,8 @@
 </style>
 </helmet>
 
-<div style="width: 1920px; height: 1080px; box-sizing: border-box; display: grid; grid-template-columns: 1fr 452px; grid-template-rows: 78px 1fr 232px; gap: var(--space-2); padding: var(--space-2); background: var(--color-bg); color: var(--color-text); font-family: var(--font-body); overflow: hidden;">
+<div style="width: {{ frameW }}; height: {{ frameH }}; overflow: hidden;">
+<div style="width: 1920px; height: 1080px; box-sizing: border-box; display: grid; grid-template-columns: 1fr 452px; grid-template-rows: 78px 1fr 232px; gap: var(--space-2); padding: var(--space-2); background: var(--color-bg); color: var(--color-text); font-family: var(--font-body); overflow: hidden; transform: scale({{ scale }}); transform-origin: top left;">
 
   <div style="grid-column: 1; grid-row: 1; display: flex; align-items: stretch; background: var(--color-surface); border-radius: var(--radius-md); overflow: hidden;">
     <div style="display: flex; flex-direction: column; justify-content: center; gap: 1px; padding: 0 var(--space-6); min-width: 306px;">
@@ -334,6 +335,7 @@
     </div>
   </sc-if>
 </div>
+</div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1920,&quot;height&quot;:1080},&quot;modelTag&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;retina-cls v0.3 · TF.js · RFMiD {N,D,G,A,H,O}&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;모델&quot;}}">
 // 외부 모델 라벨셋 — 모델 출력 키와 1:1. 라벨 추가/변경 시 이 객체만 수정.
@@ -349,6 +351,19 @@ const LABELS = {
 // UI/UX 확인용 임시 이미지 — RFMiD 전처리본(512×512) 8장을 환자 3명에 공통으로 재사용한다.
 // 화면의 소견·유사도 값과는 아무 관계가 없다. 실제 구현에서는 환자별 촬영 영상과
 // 임베딩 이웃 검색 결과로 교체된다.
+// 설계 캔버스는 1920x1080 고정이다. 반응형은 레이아웃을 다시 짜는 대신
+// 캔버스 전체를 가로 폭에 맞춰 축소/확대한다 — 16:9 가 항상 유지되고 디자인이 그대로 보존된다.
+// 세로는 고려하지 않는다(가로에서 파생). MIN_SCALE 아래로는 9px 텍스트가 읽을 수 없게 되므로
+// 더 줄이지 않고 가로 스크롤을 허용한다.
+const CANVAS_W = 1920, CANVAS_H = 1080, MIN_SCALE = 0.55;
+
+function fitScale() {
+  // clientWidth 는 스크롤바를 제외한다 — 100vw 를 쓰면 스크롤바 폭 때문에 흔들린다.
+  const el = document.documentElement;
+  const w = (el && el.clientWidth) || window.innerWidth || CANVAS_W;
+  return Math.max(MIN_SCALE, w / CANVAS_W);
+}
+
 const IMG = 'sample/';
 const DEMO_IMG = {
   os: IMG + 'patient-os.jpg',
@@ -489,14 +504,21 @@ class Component extends DCLogic {
     z: { os: { s: 1, x: 0, y: 0 }, od: { s: 1, x: 0, y: 0 } },
     viewer: null,
     compare: null,
-    copied: false
+    copied: false,
+    scale: fitScale()
   };
 
   componentDidMount() {
     this._key = (e) => { if (e.key === 'Escape') this.setState({ compare: null, viewer: null }); };
+    this._fit = () => this.setState({ scale: fitScale() });
     window.addEventListener('keydown', this._key);
+    window.addEventListener('resize', this._fit);
+    this._fit();
   }
-  componentWillUnmount() { window.removeEventListener('keydown', this._key); }
+  componentWillUnmount() {
+    window.removeEventListener('keydown', this._key);
+    window.removeEventListener('resize', this._fit);
+  }
 
   setZ(eye, fn) {
     this.setState(s => ({ z: Object.assign({}, s.z, { [eye]: fn(s.z[eye]) }) }));
@@ -517,7 +539,10 @@ class Component extends DCLogic {
       if (e.button !== 0) return;
       const sx = e.clientX, sy = e.clientY;
       const base = this.state.z[eye];
-      const move = (ev) => this.setZ(eye, () => ({ s: base.s, x: base.x + (ev.clientX - sx), y: base.y + (ev.clientY - sy) }));
+      // 커서 이동량은 화면 픽셀, translate 는 캔버스 픽셀이다. 캔버스가 k 배로
+      // 축소돼 있으므로 k 로 나눠야 영상이 커서를 1:1 로 따라온다.
+      const k = this.state.scale || 1;
+      const move = (ev) => this.setZ(eye, () => ({ s: base.s, x: base.x + (ev.clientX - sx) / k, y: base.y + (ev.clientY - sy) / k }));
       const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', up);
@@ -658,6 +683,9 @@ class Component extends DCLogic {
     } : null;
 
     return {
+      scale: this.state.scale,
+      frameW: Math.round(CANVAS_W * this.state.scale) + 'px',
+      frameH: Math.round(CANVAS_H * this.state.scale) + 'px',
       p: Object.assign({}, p, {
         os: Object.assign({}, p.os, { preds: this.pred(p.os.preds), img: DEMO_IMG.os }),
         od: Object.assign({}, p.od, { preds: this.pred(p.od.preds), img: DEMO_IMG.od })
