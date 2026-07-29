@@ -69,11 +69,16 @@
       </div>
     </div>
 
-    <div style="flex: 1; display: grid; grid-template-columns: repeat(6, 1fr); align-items: center;">
+    <!-- 6칸 등분이 아니다. 앞 세 칸(체중·혈압·HbA1c)과 교정시력은 짧은 수치라 좁아도 되고,
+         기저질환·복용약은 자유 텍스트라 등분하면 2줄에서 잘린다. 전체 폭은 그대로 6fr. -->
+    <div style="flex: 1; display: grid; grid-template-columns: 0.85fr 0.85fr 0.85fr 1.25fr 0.95fr 1.25fr; align-items: center;">
       <sc-for list="{{ p.vitals }}" as="v" hint-placeholder-count="6">
         <div style="padding: 0 var(--space-4); display: flex; flex-direction: column; gap: 1px;">
           <span style="font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-500);">{{ v.k }}</span>
-          <span class="num" style="font-size: 16px; font-weight: 500; line-height: 1.25; color: var(--color-neutral-100);">{{ v.v }}</span>
+          <!-- 헤더는 78px 고정이다. 값이 3줄이 되면 아래로 넘쳐 잘리는데, overflow: hidden
+               만으로는 글자 중간이 잘려 "잘렸다"는 신호가 없다. 2줄로 클램프해 말줄임표가
+               나오게 한다 — 임상 값이 조용히 사라지는 것보다 잘렸다고 보이는 편이 안전하다. -->
+          <span class="num" style="font-size: 16px; font-weight: 500; line-height: 1.25; color: var(--color-neutral-100); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{ v.v }}</span>
           <span style="font-size: 11px; line-height: 1.25; color: var(--c-warn);">{{ v.note }}</span>
         </div>
       </sc-for>
@@ -126,6 +131,16 @@
               <span class="num" style="font-family: var(--font-heading); font-weight: 500; font-size: 15px; line-height: 1; color: var(--color-accent-300);">{{ d.pctText }}</span>
             </div>
           </sc-for>
+          <!-- 2단계 등급. 게이트를 넘은 눈에만 뜬다. 여기도 accent 단색이다 —
+               등급 숫자를 위험 색으로 물들이면 확진처럼 읽힌다. -->
+          <div class="onimg" style="display: {{ osDrShow }}; flex-direction: column; gap: 1px; margin-top: var(--space-1); padding-top: var(--space-2); border-top: 1px solid rgba(243, 244, 246, 0.24);">
+            <span style="font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-neutral-300);">DR 중증도 · 2단계</span>
+            <div style="display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3);">
+              <span style="font-size: 12px; color: var(--color-neutral-100);">{{ osDrLabel }}</span>
+              <span class="num" style="font-family: var(--font-heading); font-weight: 500; font-size: 15px; line-height: 1; color: var(--color-accent-300);">{{ osDrPct }}</span>
+            </div>
+            <span class="num" style="font-size: 10px; line-height: 1.35; color: var(--color-neutral-300);">{{ osDrSub }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -158,6 +173,14 @@
               <span class="num" style="font-family: var(--font-heading); font-weight: 500; font-size: 15px; line-height: 1; color: var(--color-accent-300);">{{ d.pctText }}</span>
             </div>
           </sc-for>
+          <div class="onimg" style="display: {{ odDrShow }}; flex-direction: column; gap: 1px; margin-top: var(--space-1); padding-top: var(--space-2); border-top: 1px solid rgba(243, 244, 246, 0.24);">
+            <span style="font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-neutral-300);">DR 중증도 · 2단계</span>
+            <div style="display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3);">
+              <span style="font-size: 12px; color: var(--color-neutral-100);">{{ odDrLabel }}</span>
+              <span class="num" style="font-family: var(--font-heading); font-weight: 500; font-size: 15px; line-height: 1; color: var(--color-accent-300);">{{ odDrPct }}</span>
+            </div>
+            <span class="num" style="font-size: 10px; line-height: 1.35; color: var(--color-neutral-300);">{{ odDrSub }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -191,36 +214,92 @@
 
     <div style="flex: 1; overflow-y: auto; padding: 0 var(--space-6) var(--space-6); display: flex; flex-direction: column; gap: var(--space-8); min-height: 0;">
 
-      <div style="display: flex; flex-direction: column; gap: var(--space-3);">
-        <div style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-500);">의심 소견 · 양안 전체</div>
-        <div style="font-size: 11px; line-height: 1.5; color: var(--color-neutral-500); text-wrap: pretty; margin-top: -4px;">한쪽 눈에만 나타난 소견도 전부 포함합니다. 복수 소견이 동반될 수 있으므로 순위와 무관하게 검토하세요.</div>
-        <sc-for list="{{ suspects }}" as="d" hint-placeholder-count="3">
-          <div style="display: flex; flex-direction: column; gap: var(--space-1);">
-            <div style="display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3);">
-              <span style="font-size: 15px; color: var(--color-neutral-100);">{{ d.label }}</span>
-              <span class="num" style="font-family: var(--font-heading); font-weight: 500; font-size: 16px; color: var(--color-neutral-100);">{{ d.pctText }}</span>
-            </div>
-            <div style="height: 4px; border-radius: var(--radius-sm); background: var(--color-neutral-800); overflow: hidden;">
-              <div style="height: 100%; width: {{ d.pctText }}; background: var(--color-accent-500);"></div>
-            </div>
-            <div style="display: flex; justify-content: space-between; gap: var(--space-3); font-size: 11px; color: var(--color-neutral-500);">
-              <span class="num">{{ d.eyes }}</span>
-              <span>{{ d.side }}</span>
-            </div>
+      <!-- 의심 소견은 눈별로 분리한다. 양안을 하나의 순위로 합치지 않는다 —
+           같은 소견이 양안에 함께 나타나는 경우가 오히려 드물고, 한쪽 눈에만
+           나타나거나 두 눈이 서로 다른 소견을 보이는 쪽이 흔하다. 합치면 한쪽 눈의
+           소견이 반대쪽의 더 높은 값에 묻히고 "어느 눈을 봐야 하는가"가 사라진다.
+           블록을 두 개로 쓴 것은 sc-for 를 중첩하지 않기 위한 것이기도 하다. -->
+      <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+        <div>
+          <div style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-500);">의심 소견 · 눈별 분리</div>
+          <div style="font-size: 11px; line-height: 1.5; color: var(--color-neutral-500); text-wrap: pretty; margin-top: var(--space-1);">두 눈을 하나의 순위로 합치지 않습니다. 한쪽 눈에만 나타난 소견도 전부 개별 의심 항목이며, 한 눈에 여러 소견이 동반될 수 있습니다.</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+          <div style="display: flex; align-items: baseline; gap: var(--space-2);">
+            <span class="tag" style="border: 1px solid var(--color-accent); color: var(--color-accent-300);">OS</span>
+            <span style="font-size: 13px; color: var(--color-neutral-200);">좌안</span>
+            <span class="num" style="font-size: 11px; color: var(--color-neutral-500);">{{ osCount }}</span>
           </div>
-        </sc-for>
+          <sc-for list="{{ suspectsOS }}" as="d" hint-placeholder-count="2">
+            <div style="display: flex; flex-direction: column; gap: var(--space-1);">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3);">
+                <span style="font-size: 15px; color: var(--color-neutral-100);">{{ d.label }}</span>
+                <span class="num" style="font-family: var(--font-heading); font-weight: 500; font-size: 16px; color: var(--color-neutral-100);">{{ d.pctText }}</span>
+              </div>
+              <div style="height: 4px; border-radius: var(--radius-sm); background: var(--color-neutral-800); overflow: hidden;">
+                <div style="height: 100%; width: {{ d.pctText }}; background: var(--color-accent-500);"></div>
+              </div>
+              <div style="font-size: 11px; color: var(--color-neutral-500);">{{ d.soloTag }}</div>
+              <!-- 2단계 결과. D 행에만 붙고, 게이트를 넘지 못하면 그 사실을 적는다. -->
+              <div style="display: {{ d.drShow }}; flex-direction: column; gap: 2px; margin-top: var(--space-1); padding-left: var(--space-3); border-left: 1px solid var(--color-accent-800);">
+                <span style="font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-500);">2단계 · DR 중증도</span>
+                <span class="num" style="font-size: 13px; color: var(--color-neutral-100);">{{ d.drText }}</span>
+                <span style="font-size: 11px; line-height: 1.45; color: var(--color-neutral-500); text-wrap: pretty;">{{ d.drNote }}</span>
+              </div>
+            </div>
+          </sc-for>
+          <div style="display: {{ osEmptyShow }}; font-size: 12px; line-height: 1.5; color: var(--color-neutral-500); text-wrap: pretty;">{{ emptyText }}</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+          <div style="display: flex; align-items: baseline; gap: var(--space-2);">
+            <span class="tag" style="border: 1px solid var(--color-accent); color: var(--color-accent-300);">OD</span>
+            <span style="font-size: 13px; color: var(--color-neutral-200);">우안</span>
+            <span class="num" style="font-size: 11px; color: var(--color-neutral-500);">{{ odCount }}</span>
+          </div>
+          <sc-for list="{{ suspectsOD }}" as="d" hint-placeholder-count="2">
+            <div style="display: flex; flex-direction: column; gap: var(--space-1);">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3);">
+                <span style="font-size: 15px; color: var(--color-neutral-100);">{{ d.label }}</span>
+                <span class="num" style="font-family: var(--font-heading); font-weight: 500; font-size: 16px; color: var(--color-neutral-100);">{{ d.pctText }}</span>
+              </div>
+              <div style="height: 4px; border-radius: var(--radius-sm); background: var(--color-neutral-800); overflow: hidden;">
+                <div style="height: 100%; width: {{ d.pctText }}; background: var(--color-accent-500);"></div>
+              </div>
+              <div style="font-size: 11px; color: var(--color-neutral-500);">{{ d.soloTag }}</div>
+              <div style="display: {{ d.drShow }}; flex-direction: column; gap: 2px; margin-top: var(--space-1); padding-left: var(--space-3); border-left: 1px solid var(--color-accent-800);">
+                <span style="font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-500);">2단계 · DR 중증도</span>
+                <span class="num" style="font-size: 13px; color: var(--color-neutral-100);">{{ d.drText }}</span>
+                <span style="font-size: 11px; line-height: 1.45; color: var(--color-neutral-500); text-wrap: pretty;">{{ d.drNote }}</span>
+              </div>
+            </div>
+          </sc-for>
+          <div style="display: {{ odEmptyShow }}; font-size: 12px; line-height: 1.5; color: var(--color-neutral-500); text-wrap: pretty;">{{ emptyText }}</div>
+        </div>
+
         <div class="num" style="font-size: 11px; color: var(--color-neutral-500);">{{ normalLine }}</div>
       </div>
 
       <div style="display: flex; flex-direction: column; gap: var(--space-3);">
         <div style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-500);">권장 협진 · 시급도</div>
+        <!-- 의뢰는 과 단위로 나가므로 과로 묶되, 어떤 소견이 이 의뢰를 만들었는지
+             눈별 값과 함께 카드에 남긴다. 시급도는 묶인 소견 중 가장 급한 것이다. -->
         <sc-for list="{{ referrals }}" as="r" hint-placeholder-count="2">
-          <div style="display: flex; flex-direction: column; gap: var(--space-1); background: var(--color-neutral-900); border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: var(--space-4); box-shadow: {{ r.mark }};">
+          <div style="display: flex; flex-direction: column; gap: var(--space-2); background: var(--color-neutral-900); border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: var(--space-4); box-shadow: {{ r.mark }};">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);">
               <span style="font-family: var(--font-heading); font-weight: 500; font-size: 17px;">{{ r.dept }}</span>
               <span class="tag" style="{{ r.badgeStyle }}">{{ r.urgency }}</span>
             </div>
+            <span class="num" style="font-size: 11px; line-height: 1.5; color: var(--color-neutral-400); text-wrap: pretty;">{{ r.driverText }}</span>
             <span style="font-size: 13px; line-height: 1.5; color: var(--color-neutral-300); text-wrap: pretty;">{{ r.reason }}</span>
+          </div>
+        </sc-for>
+        <!-- 주의 노트: 동반 소견 / 양안 등급 비대칭. 소견을 하나로 좁히지 말라는 경고다. -->
+        <sc-for list="{{ notes }}" as="n" hint-placeholder-count="1">
+          <div style="display: flex; flex-direction: column; gap: 2px; background: var(--color-neutral-900); border: 1px solid color-mix(in srgb, var(--c-warn) 34%, transparent); border-radius: var(--radius-md); padding: var(--space-4);">
+            <span style="font-family: var(--font-heading); font-weight: 500; font-size: 14px; color: var(--color-neutral-100); text-wrap: pretty;">{{ n.title }}</span>
+            <span style="font-size: 12px; line-height: 1.5; color: var(--color-neutral-300); text-wrap: pretty;">{{ n.body }}</span>
           </div>
         </sc-for>
       </div>
@@ -253,7 +332,11 @@
         <div style="font-size: 14px; line-height: 1.6; color: var(--color-neutral-200); text-wrap: pretty; border-left: 2px solid var(--color-accent); padding-left: var(--space-4);">{{ patientLine }}</div>
       </div>
 
-      <div style="font-size: 11px; line-height: 1.6; color: var(--color-neutral-500); text-wrap: pretty;">본 결과는 RFMiD 공개 데이터로 학습된 보조 도구의 통계적 추정치이며 진단이 아닙니다. 최종 판단은 의료진의 임상 소견에 따릅니다. 낮은 화질·산동 부족·주변부 미포함 영상에서는 신뢰도가 저하됩니다.</div>
+      <!-- 데이터셋 출처와 2단계의 조건부 성격은 화면에서 내리지 않는다.
+           2단계는 "DR 아님" 등급이 학습 데이터에 없어 정상을 말할 수 없다 —
+           1단계가 D 를 오탐하면 2단계는 그 위에서 등급을 붙인다. 그 사실이 화면에 없으면
+           등급이 단독 결론으로 읽힌다. -->
+      <div style="font-size: 11px; line-height: 1.6; color: var(--color-neutral-500); text-wrap: pretty;">본 결과는 공개 안저 데이터(1단계 6클래스 · ODIR-5K 계열, 2단계 DR 4등급 · IDRiD)로 학습된 보조 도구의 통계적 추정치이며 진단이 아닙니다. 최종 판단은 의료진의 임상 소견에 따릅니다. 2단계 등급은 <b style="font-weight: 500; color: var(--color-neutral-400);">1단계가 당뇨망막병증을 의심한 경우의 조건부 추정</b>이며, 학습 데이터에 "DR 아님" 등급이 없어 2단계 단독으로는 정상을 판정할 수 없습니다. 낮은 화질·산동 부족·주변부 미포함 영상에서는 신뢰도가 저하됩니다.</div>
     </div>
 
     <div style="display: flex; gap: var(--space-2); padding: var(--space-4) var(--space-6); flex-shrink: 0;">
@@ -311,6 +394,14 @@
                 <span class="num" style="font-family: var(--font-heading); font-weight: 500; font-size: 15px; line-height: 1; color: var(--color-accent-300);">{{ d.pctText }}</span>
               </div>
             </sc-for>
+            <div class="onimg" style="display: {{ viewer.drShow }}; flex-direction: column; gap: 1px; margin-top: var(--space-1); padding-top: var(--space-2); border-top: 1px solid rgba(243, 244, 246, 0.24);">
+              <span style="font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-neutral-300);">DR 중증도 · 2단계</span>
+              <div style="display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3);">
+                <span style="font-size: 12px; color: var(--color-neutral-100);">{{ viewer.drLabel }}</span>
+                <span class="num" style="font-family: var(--font-heading); font-weight: 500; font-size: 15px; line-height: 1; color: var(--color-accent-300);">{{ viewer.drPct }}</span>
+              </div>
+              <span class="num" style="font-size: 10px; line-height: 1.35; color: var(--color-neutral-300);">{{ viewer.drSub }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -356,7 +447,7 @@
 </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1920,&quot;height&quot;:1080},&quot;modelTag&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;retina-cls v0.3 · TF.js · RFMiD {N,D,G,A,H,O}&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;모델&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1920,&quot;height&quot;:1080},&quot;modelTag&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;모델&quot;}}">
 // 외부 모델 라벨셋 — 모델 출력 키와 1:1. 라벨 추가/변경 시 이 객체만 수정.
 const LABELS = {
   N: '정상 (Normal)',
@@ -408,17 +499,45 @@ const MODEL_URL = '../../data/model/model.json';
 
 const SUSPECT_MIN = 0.15;
 
+// ── 2단계 모델 계약 (당뇨망막병증 중증도) ────────────────────────────────
+// 1단계와 성질이 다르다. 1단계는 다중라벨(한 눈에 여러 소견 공존)이지만,
+// 2단계는 병기 하나를 고르는 상호배타 4분류다 — softmax + categorical CE.
+const DR_GRADE_ORDER = [1, 2, 3, 4];
+const DR_MODEL_MULTILABEL = false;
+const DR_LABELS = {
+  1: '경증 비증식 (Mild NPDR)',
+  2: '중등도 비증식 (Moderate NPDR)',
+  3: '중증 비증식 (Severe NPDR)',
+  4: '증식성 (Proliferative DR)'
+};
+const DR_MODEL_INPUT = { size: 224, channels: 3, scale: 1 / 255, mean: null, std: null };
+const DR_MODEL_URL = '../../data/model-dr/model.json';
+
+// 1단계의 D 확률이 이 값을 넘은 눈에만 2단계를 돌린다. SUSPECT_MIN(0.15)보다
+// 높게 잡았다 — 의심 목록에 D 를 올리는 임계값과 등급을 붙이는 임계값은 다르다.
+// D 가 겨우 걸친 눈에 "3등급" 같은 단정적 병기를 붙이면 과신을 만든다.
+const DR_GATE = 0.5;
+
+// 학습 데이터에 "DR 없음"(grading_0) 등급이 없다. 그래서 2단계는 정상을 말할 수
+// 없고, 1단계가 D 를 틀리게 의심하면 2단계는 그래도 등급 하나를 자신 있게 낸다.
+// 화면은 등급을 단독 결론으로 쓰지 말고 항상 "1단계가 D 로 의심한 경우의 추정
+// 병기"라는 조건부로 표시할 것.
+const DR_CONDITIONAL_ONLY = true;
+
 // ==== GENERATED — 수정하지 마세요. `python3 data/build.py` 가 이 블록을 덮어씁니다. ====
-// 출처: data/scenarios.csv (7건). 실제 데이터는 age/sex/영상/라벨뿐이며
+// 출처: data/scenarios.csv (10건). 실제 데이터는 age/sex/영상/라벨뿐이며
 // 임상정보와 환자명은 생성값이다 — clinical_fields_synthetic 열 참고.
 const SCENARIOS = [
-  { scenario_no: 1, scenario_key: "both_normal", scenario_name: "양안 정상", demo_primary: 1, patient_id: "3079", age: "66", sex: "Female", osImage: "s1-os.jpg", odImage: "s1-od.jpg", osLabels: "N", odLabels: "N", osArtifact: "", odArtifact: "", osSourceFile: "3079_left.jpg", odSourceFile: "3079_right.jpg", displayName: "한지영", chartNo: "DEMO-3079", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "58 kg · 22.5", bloodPressure: "118 / 74", hba1c: "5.4 %", history: "없음", correctedVision: "OS 0.9 / OD 1.0", medication: "없음", vitalNotes: "", patientLine: "양쪽 눈 모두 이번 사진에서는 특별한 변화가 보이지 않습니다. 정기 검진 주기를 지켜주시면 됩니다." },
-  { scenario_no: 2, scenario_key: "unilateral_single", scenario_name: "단안 단일 소견", demo_primary: 1, patient_id: "1417", age: "83", sex: "Male", osImage: "s2-os.jpg", odImage: "s2-od.jpg", osLabels: "N", odLabels: "G", osArtifact: "", odArtifact: "", osSourceFile: "1417_left.jpg", odSourceFile: "1417_right.jpg", displayName: "최병호", chartNo: "DEMO-1417", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "63 kg · 23.1", bloodPressure: "134 / 80", hba1c: "5.8 %", history: "녹내장 (형)", correctedVision: "OS 0.8 / OD 0.5", medication: "없음", vitalNotes: "hist=가족력 고위험|vision=우안 저하", patientLine: "오른쪽 눈 시신경 모양이 녹내장 초기와 비슷합니다. 녹내장은 증상 없이 진행되므로 안과에서 안압과 시야검사를 받아보시길 권합니다." },
-  { scenario_no: 3, scenario_key: "unilateral_multi", scenario_name: "단안 복수 소견", demo_primary: 1, patient_id: "4330", age: "57", sex: "Female", osImage: "s3-os.jpg", odImage: "s3-od.jpg", osLabels: "N", odLabels: "A|D", osArtifact: "", odArtifact: "", osSourceFile: "4330_left.jpg", odSourceFile: "4330_right.jpg", displayName: "윤미경", chartNo: "DEMO-4330", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "60 kg · 24.2", bloodPressure: "138 / 86", hba1c: "8.4 %", history: "T2DM 9년", correctedVision: "OS 0.9 / OD 0.4", medication: "Metformin", vitalNotes: "hba1c=조절 미흡|vision=우안 왜곡 호소", patientLine: "오른쪽 눈에 두 가지 변화가 함께 보입니다. 당뇨로 인한 혈관 변화와 중심부(황반) 노화 변화입니다. 두 가지 모두 안과에서 확인이 필요합니다." },
-  { scenario_no: 4, scenario_key: "bilateral_same", scenario_name: "양안 동일 소견", demo_primary: 0, patient_id: "4318", age: "55", sex: "Male", osImage: "s4-os.jpg", odImage: "s4-od.jpg", osLabels: "D", odLabels: "D", osArtifact: "", odArtifact: "", osSourceFile: "4318_left.jpg", odSourceFile: "4318_right.jpg", displayName: "임재식", chartNo: "DEMO-4318", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "79 kg · 26.8", bloodPressure: "142 / 88", hba1c: "9.6 %", history: "T2DM 14년", correctedVision: "OS 0.6 / OD 0.7", medication: "Metformin, Glimepiride", vitalNotes: "hba1c=장기 미조절|bp=고혈압 범위", patientLine: "양쪽 눈 혈관에 당뇨로 인한 변화가 같은 정도로 보입니다. 눈만의 문제가 아니라 전신 혈관 상태를 함께 봐야 합니다. 혈당 조절이 가장 중요한 치료입니다." },
-  { scenario_no: 5, scenario_key: "bilateral_diff", scenario_name: "양안 서로 다른 소견", demo_primary: 1, patient_id: "4215", age: "66", sex: "Male", osImage: "s5-os.jpg", odImage: "s5-od.jpg", osLabels: "D", odLabels: "H", osArtifact: "", odArtifact: "", osSourceFile: "4215_left.jpg", odSourceFile: "4215_right.jpg", displayName: "강동수", chartNo: "DEMO-4215", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "74 kg · 25.4", bloodPressure: "156 / 94", hba1c: "7.9 %", history: "T2DM 6년, HTN", correctedVision: "OS 0.5 / OD 0.7", medication: "Metformin, Amlodipine", vitalNotes: "bp=고혈압 2기|hba1c=조절 미흡", patientLine: "두 눈에 서로 다른 변화가 있습니다. 왼쪽은 당뇨로 인한 변화, 오른쪽은 혈압으로 인한 변화입니다. 혈당과 혈압을 함께 관리해야 합니다." },
-  { scenario_no: 6, scenario_key: "bilateral_multi", scenario_name: "양안 모두 복수 소견", demo_primary: 0, patient_id: "931", age: "65", sex: "Male", osImage: "s6-os.jpg", odImage: "s6-od.jpg", osLabels: "D|G", odLabels: "D|G", osArtifact: "", odArtifact: "", osSourceFile: "931_left.jpg", odSourceFile: "931_right.jpg", displayName: "서정한", chartNo: "DEMO-931", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "71 kg · 24.9", bloodPressure: "146 / 90", hba1c: "8.8 %", history: "T2DM 11년, 안압 상승 이력", correctedVision: "OS 0.4 / OD 0.5", medication: "Metformin, Latanoprost 점안", vitalNotes: "hba1c=조절 미흡|hist=녹내장 추적 중|vision=양안 저하", patientLine: "양쪽 눈에 당뇨로 인한 혈관 변화와 시신경 변화가 함께 보입니다. 두 가지가 겹치면 시력 손상이 빠를 수 있어 안과 진료가 필요합니다." },
-  { scenario_no: 7, scenario_key: "bilateral_overlap", scenario_name: "양안 일부 겹침 (비대칭 진행)", demo_primary: 1, patient_id: "323", age: "65", sex: "Male", osImage: "s7-os.jpg", odImage: "s7-od.jpg", osLabels: "H|O", odLabels: "H", osArtifact: "", odArtifact: "", osSourceFile: "323_left.jpg", odSourceFile: "323_right.jpg", displayName: "노경환", chartNo: "DEMO-323", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "68 kg · 24.1", bloodPressure: "152 / 92", hba1c: "6.1 %", history: "HTN 8년", correctedVision: "OS 0.6 / OD 0.8", medication: "Losartan", vitalNotes: "bp=고혈압 2기|vision=좌안 저하", patientLine: "양쪽 눈 혈관에 혈압으로 인한 변화가 있고, 왼쪽 눈에는 추가 변화가 한 가지 더 보입니다. 혈압 관리와 함께 왼쪽 눈을 우선 확인해야 합니다." }
+  { scenario_no: 1, scenario_key: "both_normal", scenario_name: "양안 정상", demo_primary: 1, patient_id: "3079", age: "66", sex: "Female", osImage: "s1-os.jpg", odImage: "s1-od.jpg", osLabels: "N", odLabels: "N", osDrGrade: "", odDrGrade: "", drPattern: "none", osDataset: "ODIR-5K", odDataset: "ODIR-5K", osDrGradeSource: "", odDrGradeSource: "", osArtifact: "", odArtifact: "", osSourceFile: "3079_left.jpg", odSourceFile: "3079_right.jpg", displayName: "한지영", chartNo: "DEMO-3079", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "58 kg · 22.5", bloodPressure: "118 / 74", hba1c: "5.4 %", history: "없음", correctedVision: "OS 0.9 / OD 1.0", medication: "없음", vitalNotes: "", patientLine: "양쪽 눈 모두 이번 사진에서는 특별한 변화가 보이지 않습니다. 정기 검진 주기를 지켜주시면 됩니다." },
+  { scenario_no: 2, scenario_key: "unilateral_single", scenario_name: "단안 단일 소견", demo_primary: 1, patient_id: "1417", age: "83", sex: "Male", osImage: "s2-os.jpg", odImage: "s2-od.jpg", osLabels: "N", odLabels: "G", osDrGrade: "", odDrGrade: "", drPattern: "none", osDataset: "ODIR-5K", odDataset: "ODIR-5K", osDrGradeSource: "", odDrGradeSource: "", osArtifact: "", odArtifact: "", osSourceFile: "1417_left.jpg", odSourceFile: "1417_right.jpg", displayName: "최병호", chartNo: "DEMO-1417", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "63 kg · 23.1", bloodPressure: "134 / 80", hba1c: "5.8 %", history: "녹내장 (형)", correctedVision: "OS 0.8 / OD 0.5", medication: "없음", vitalNotes: "hist=가족력 고위험|vision=우안 저하", patientLine: "오른쪽 눈 시신경 모양이 녹내장 초기와 비슷합니다. 녹내장은 증상 없이 진행되므로 안과에서 안압과 시야검사를 받아보시길 권합니다." },
+  { scenario_no: 3, scenario_key: "unilateral_multi", scenario_name: "단안 복수 소견", demo_primary: 1, patient_id: "4330", age: "57", sex: "Female", osImage: "s3-os.jpg", odImage: "s3-od.jpg", osLabels: "N", odLabels: "A|D", osDrGrade: "", odDrGrade: 1, drPattern: "unilateral", osDataset: "ODIR-5K", odDataset: "ODIR-5K", osDrGradeSource: "", odDrGradeSource: "odir_keyword", osArtifact: "", odArtifact: "", osSourceFile: "4330_left.jpg", odSourceFile: "4330_right.jpg", displayName: "윤미경", chartNo: "DEMO-4330", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "60 kg · 24.2", bloodPressure: "138 / 86", hba1c: "8.4 %", history: "T2DM 9년", correctedVision: "OS 0.9 / OD 0.4", medication: "Metformin", vitalNotes: "hba1c=조절 미흡|vision=우안 왜곡 호소", patientLine: "오른쪽 눈에 두 가지 변화가 함께 보입니다. 당뇨로 인한 혈관 변화와 중심부(황반) 노화 변화입니다. 두 가지 모두 안과에서 확인이 필요합니다." },
+  { scenario_no: 4, scenario_key: "bilateral_same", scenario_name: "양안 동일 소견", demo_primary: 0, patient_id: "4318", age: "55", sex: "Male", osImage: "s4-os.jpg", odImage: "s4-od.jpg", osLabels: "D", odLabels: "D", osDrGrade: 2, odDrGrade: 2, drPattern: "bilateral_same_grade", osDataset: "IDRiD", odDataset: "IDRiD", osDrGradeSource: "idrid_folder", odDrGradeSource: "idrid_folder", osArtifact: "", odArtifact: "", osSourceFile: "grading_2/IDRiD_020test.jpg", odSourceFile: "grading_2/IDRiD_023test.jpg", displayName: "임재식", chartNo: "DEMO-4318", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "79 kg · 26.8", bloodPressure: "142 / 88", hba1c: "9.6 %", history: "T2DM 14년", correctedVision: "OS 0.6 / OD 0.7", medication: "Metformin, Glimepiride", vitalNotes: "hba1c=장기 미조절|bp=고혈압 범위", patientLine: "양쪽 눈 혈관에 당뇨로 인한 변화가 같은 정도로 보입니다. 눈만의 문제가 아니라 전신 혈관 상태를 함께 봐야 합니다. 혈당 조절이 가장 중요한 치료입니다." },
+  { scenario_no: 5, scenario_key: "bilateral_diff", scenario_name: "양안 서로 다른 소견", demo_primary: 1, patient_id: "4215", age: "66", sex: "Male", osImage: "s5-os.jpg", odImage: "s5-od.jpg", osLabels: "D", odLabels: "H", osDrGrade: 1, odDrGrade: "", drPattern: "unilateral", osDataset: "IDRiD", odDataset: "ODIR-5K", osDrGradeSource: "idrid_folder", odDrGradeSource: "", osArtifact: "", odArtifact: "", osSourceFile: "grading_1/IDRiD_064test.jpg", odSourceFile: "4215_right.jpg", displayName: "강동수", chartNo: "DEMO-4215", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "74 kg · 25.4", bloodPressure: "156 / 94", hba1c: "7.9 %", history: "T2DM 6년, HTN", correctedVision: "OS 0.5 / OD 0.7", medication: "Metformin, Amlodipine", vitalNotes: "bp=고혈압 2기|hba1c=조절 미흡", patientLine: "두 눈에 서로 다른 변화가 있습니다. 왼쪽은 당뇨로 인한 변화, 오른쪽은 혈압으로 인한 변화입니다. 혈당과 혈압을 함께 관리해야 합니다." },
+  { scenario_no: 6, scenario_key: "bilateral_multi", scenario_name: "양안 모두 복수 소견", demo_primary: 0, patient_id: "931", age: "65", sex: "Male", osImage: "s6-os.jpg", odImage: "s6-od.jpg", osLabels: "D|G", odLabels: "D|G", osDrGrade: 2, odDrGrade: 2, drPattern: "bilateral_same_grade", osDataset: "ODIR-5K", odDataset: "ODIR-5K", osDrGradeSource: "odir_keyword", odDrGradeSource: "odir_keyword", osArtifact: "", odArtifact: "", osSourceFile: "931_left.jpg", odSourceFile: "931_right.jpg", displayName: "서정한", chartNo: "DEMO-931", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "71 kg · 24.9", bloodPressure: "146 / 90", hba1c: "8.8 %", history: "T2DM 11년, 안압 상승 이력", correctedVision: "OS 0.4 / OD 0.5", medication: "Metformin, Latanoprost 점안", vitalNotes: "hba1c=조절 미흡|hist=녹내장 추적 중|vision=양안 저하", patientLine: "양쪽 눈에 당뇨로 인한 혈관 변화와 시신경 변화가 함께 보입니다. 두 가지가 겹치면 시력 손상이 빠를 수 있어 안과 진료가 필요합니다." },
+  { scenario_no: 7, scenario_key: "bilateral_overlap", scenario_name: "양안 일부 겹침 (비대칭 진행)", demo_primary: 1, patient_id: "323", age: "65", sex: "Male", osImage: "s7-os.jpg", odImage: "s7-od.jpg", osLabels: "H|O", odLabels: "H", osDrGrade: "", odDrGrade: "", drPattern: "none", osDataset: "ODIR-5K", odDataset: "ODIR-5K", osDrGradeSource: "", odDrGradeSource: "", osArtifact: "", odArtifact: "", osSourceFile: "323_left.jpg", odSourceFile: "323_right.jpg", displayName: "노경환", chartNo: "DEMO-323", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "68 kg · 24.1", bloodPressure: "152 / 92", hba1c: "6.1 %", history: "HTN 8년", correctedVision: "OS 0.6 / OD 0.8", medication: "Losartan", vitalNotes: "bp=고혈압 2기|vision=좌안 저하", patientLine: "양쪽 눈 혈관에 혈압으로 인한 변화가 있고, 왼쪽 눈에는 추가 변화가 한 가지 더 보입니다. 혈압 관리와 함께 왼쪽 눈을 우선 확인해야 합니다." },
+  { scenario_no: 8, scenario_key: "dr_mild_unilateral", scenario_name: "DR 경증 · 단안", demo_primary: 1, patient_id: "4452", age: "48", sex: "Female", osImage: "s8-os.jpg", odImage: "s8-od.jpg", osLabels: "D", odLabels: "N", osDrGrade: 1, odDrGrade: "", drPattern: "unilateral", osDataset: "IDRiD", odDataset: "ODIR-5K", osDrGradeSource: "idrid_folder", odDrGradeSource: "", osArtifact: "", odArtifact: "", osSourceFile: "grading_1/IDRiD_073test.jpg", odSourceFile: "4452_right.jpg", displayName: "정수미", chartNo: "DEMO-4452", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "62 kg · 23.4", bloodPressure: "124 / 78", hba1c: "7.2 %", history: "T2DM 4년", correctedVision: "OS 0.9 / OD 1.0", medication: "Metformin", vitalNotes: "hba1c=조절 양호", patientLine: "왼쪽 눈에 당뇨로 인한 초기 변화가 조금 보입니다. 지금 단계에서는 시력에 영향을 주는 정도는 아니어서, 혈당 관리를 유지하면서 정해진 주기로 안과 검진을 받으시면 됩니다." },
+  { scenario_no: 9, scenario_key: "dr_grade_adjacent", scenario_name: "DR 인접 등급 (2 vs 3)", demo_primary: 0, patient_id: "4593", age: "65", sex: "Male", osImage: "s9-os.jpg", odImage: "s9-od.jpg", osLabels: "D", odLabels: "D", osDrGrade: 3, odDrGrade: 2, drPattern: "bilateral_diff_grade", osDataset: "IDRiD", odDataset: "IDRiD", osDrGradeSource: "idrid_folder", odDrGradeSource: "idrid_folder", osArtifact: "", odArtifact: "", osSourceFile: "grading_3/IDRiD_088test.jpg", odSourceFile: "grading_2/IDRiD_072test.jpg", displayName: "하성길", chartNo: "DEMO-4593", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "77 kg · 26.2", bloodPressure: "148 / 90", hba1c: "9.1 %", history: "T2DM 16년", correctedVision: "OS 0.4 / OD 0.6", medication: "Metformin, Glargine", vitalNotes: "hba1c=장기 미조절|vision=좌안 저하", patientLine: "양쪽 눈 모두 당뇨로 인한 변화가 진행돼 있고, 왼쪽이 오른쪽보다 한 단계 더 심해 보입니다. 다만 인접한 단계는 사진만으로 구분이 어려우므로 안과에서 정밀검사로 확인해야 합니다." },
+  { scenario_no: 10, scenario_key: "dr_proliferative", scenario_name: "증식성 DR (4등급)", demo_primary: 1, patient_id: "412", age: "60", sex: "Female", osImage: "s10-os.jpg", odImage: "s10-od.jpg", osLabels: "D", odLabels: "D", osDrGrade: 3, odDrGrade: 4, drPattern: "bilateral_diff_grade", osDataset: "IDRiD", odDataset: "IDRiD", osDrGradeSource: "idrid_folder", odDrGradeSource: "idrid_folder", osArtifact: "", odArtifact: "", osSourceFile: "grading_3/IDRiD_006test.jpg", odSourceFile: "grading_4/IDRiD_032test.jpg", displayName: "배옥분", chartNo: "DEMO-412", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "54 kg · 21.8", bloodPressure: "152 / 94", hba1c: "10.4 %", history: "T2DM 22년, 당뇨병성 신병증", correctedVision: "OS 0.3 / OD 0.15", medication: "Lispro, Glargine, Losartan", vitalNotes: "hba1c=장기 미조절|hist=신병증 추적 중|vision=우안 급격 저하", patientLine: "오른쪽 눈은 당뇨망막병증이 가장 진행된 단계로 보입니다. 이 단계는 갑작스러운 시력 상실로 이어질 수 있어 오늘 바로 안과 진료를 받으셔야 합니다. 왼쪽 눈도 함께 확인이 필요합니다." }
 ];
 // ==== /GENERATED ====
 
@@ -427,6 +546,16 @@ const SCENARIOS = [
 // 시나리오를 추가할 때 CSV 한 줄과 영상 2장만 넣어도 우측 패널이 전부 채워진다.
 // urgent=true 인 라벨은 확률이 URGENT_AT 을 넘을 때 시급도가 올라간다.
 const URGENT_AT = 0.7;
+
+// 시급도 문구는 사람이 읽는 값이지만 병합할 때는 비교가 필요하다. 여러 소견이 같은
+// 과로 몰릴 때 남겨야 하는 것은 "나중에 온 것"이 아니라 "가장 급한 것"이다.
+const URGENCY_RANK = {
+  '즉시 · 24시간 내': 0, '즉시 · 48시간 내': 1, '즉시 · 72시간 내': 2,
+  '1주 내': 3, '1개월 내': 4, '1년 내 재촬영': 5
+};
+function urgencyRank(t) { const r = URGENCY_RANK[t]; return r === undefined ? 3 : r; }
+function moreUrgent(a, b) { return urgencyRank(a) <= urgencyRank(b) ? a : b; }
+
 const RULES = {
   D: {
     dept: '안과 (Retina)', urgent: '즉시 · 72시간 내', normal: '1주 내',
@@ -487,6 +616,35 @@ const RULE_NORMAL = {
   reason: '이번 영상에서는 분류 대상 소견이 확인되지 않았습니다. 기저질환·위험요인에 따라 재촬영 주기를 정하세요.'
 };
 
+// ── 2단계 등급 → 임상 권고 ───────────────────────────────────────────────
+// 당뇨망막병증은 "있다/없다"로 시급도가 정해지지 않는다. 1등급과 4등급은 같은 병명이지만
+// 연 1회 추적과 당일 의뢰로 갈린다. 그래서 D 의 시급도는 1단계 유사도가 아니라 2단계
+// 등급에서 나온다 — 게이트를 넘지 못해 등급이 없는 눈만 RULES.D 의 유사도 기준으로 떨어진다.
+const DR_GRADE_RULES = {
+  1: { urgency: '1개월 내',
+       reason: '경증 비증식(Mild NPDR) 추정. 미세혈관류 수준으로 시력을 위협하는 단계는 아니며, '
+             + '혈당·혈압 관리와 연 1회 안저 추적이 우선입니다.',
+       tests: [] },
+  2: { urgency: '1주 내',
+       reason: '중등도 비증식(Moderate NPDR) 추정. 망막출혈·삼출물 동반 가능성이 있어 '
+             + '당뇨성 망막부종(DME) 확인과 6개월 간격 추적이 필요합니다.',
+       tests: [{ code: 'OCT', name: '빛간섭단층촬영 (Macular OCT)',
+                 why: '당뇨성 망막부종(DME) 유무와 중심망막두께 확인' }] },
+  3: { urgency: '즉시 · 72시간 내',
+       reason: '중증 비증식(Severe NPDR) 추정. 1년 내 증식성 전환 위험이 높은 단계로, '
+             + '범망막광응고(PRP) 시점 판단을 위해 조기 의뢰가 필요합니다.',
+       tests: [{ code: 'FAG', name: '형광안저혈관조영',
+                 why: '허혈 범위 확인 — PRP 시점 결정 근거' }] },
+  4: { urgency: '즉시 · 24시간 내',
+       reason: '증식성(Proliferative DR) 추정. 신혈관에서 유리체출혈·견인망막박리로 이어져 '
+             + '급격한 시력 상실이 가능한 단계입니다. 당일 안과 의뢰가 필요합니다.',
+       tests: [{ code: 'FAG', name: '형광안저혈관조영',
+                 why: '신혈관 위치와 허혈 범위 확인 — PRP·항VEGF 판단' }] }
+};
+
+// 1·2위 등급 차이가 이보다 작으면 "인접 등급과 근접"으로 본다.
+const DR_CLOSE_AT = 0.15;
+
 // ── 모델 연결 지점 ──────────────────────────────────────────────────────
 // 실제 연결은 MODEL.load() 와 MODEL.infer() 두 곳만 채우면 된다.
 // 화면 로직은 vector() 가 돌려주는 길이 6 확률 벡터만 알면 되고, 그 아래는 모른다.
@@ -516,6 +674,24 @@ const MODEL = {
   }
 };
 
+// ── 2단계 모델 연결 지점 ────────────────────────────────────────────────
+// 1단계와 같은 구조지만 별개의 모델이다. 가중치를 공유하지 않고 산출물도 따로 나온다.
+const DR_MODEL = {
+  status: 'mock',
+  net: null,
+
+  // 실제 연결 시: this.net = await tf.loadLayersModel(DR_MODEL_URL);
+  load: function () {
+    return Promise.resolve();
+  },
+
+  // imgUrl → DR_GRADE_ORDER 순서의 확률 배열(길이 4). softmax 라 합이 1이다.
+  // hint 는 목업 전용(정답 등급)이며 실제 구현은 영상만 보고 무시해야 한다.
+  infer: function (imgUrl, hint) {
+    return Promise.resolve(mockDrVector(hint.grade, hint.seed));
+  }
+};
+
 // 목업 확률 벡터. 시나리오·눈·코드로 만든 결정적 해시라 매번 같은 값이 나온다(시연 재현성).
 function mockJitter(seed) {
   let h = 2166136261;
@@ -536,6 +712,24 @@ function mockVector(labels, seed) {
   });
 }
 
+// 목업 등급 분포. 정답 등급을 1위로 두되 인접 등급에 의미 있는 질량을 남긴다 —
+// 인접 등급은 실제로 사진만으로 구분이 어렵고, 여기서 0.97 같은 값을 만들면 화면이
+// 없는 확신을 연출한다. 정답 등급이 없으면(1단계가 D 를 오탐한 상황) 평평하게 퍼져
+// "판단 불가"에 가까운 분포가 된다 — 2단계는 정상을 말할 수 없으므로 그게 최선이다.
+function mockDrVector(grade, seed) {
+  const raw = DR_GRADE_ORDER.map(g => {
+    const j = mockJitter(seed + 'g' + g);
+    if (!grade) return 0.20 + j * 0.14;
+    const d = Math.abs(g - grade);
+    if (d === 0) return 0.46 + j * 0.16;
+    if (d === 1) return 0.14 + j * 0.14;
+    if (d === 2) return 0.04 + j * 0.06;
+    return 0.01 + j * 0.03;
+  });
+  const sum = raw.reduce((a, b) => a + b, 0);
+  return raw.map(v => v / sum);                  // softmax 출력처럼 합이 1
+}
+
 // 확률 벡터 → 화면이 쓰는 [[코드, 확률], ...] 내림차순. 모델이 바뀌어도 이 어댑터는 그대로다.
 function toPairs(vec) {
   return LABEL_ORDER
@@ -543,13 +737,45 @@ function toPairs(vec) {
     .sort((a, b) => b[1] - a[1]);
 }
 
+// 등급 벡터 → 화면이 쓰는 객체. gateP 는 이 눈의 1단계 D 유사도다(조건부라는 근거).
+function toGrade(vec, gateP) {
+  const pairs = DR_GRADE_ORDER
+    .map((g, i) => [g, Math.round((vec[i] || 0) * 100) / 100])
+    .sort((a, b) => b[1] - a[1]);
+  const top = pairs[0], second = pairs[1];
+  const close = (top[1] - second[1]) < DR_CLOSE_AT;
+  // 1·2위가 근접하면 더 심한 쪽 기준으로 대응한다. 2등급인지 3등급인지 갈릴 때
+  // 낮은 쪽으로 처리하면 놓치는 손해가 크다 — 불확실성은 안전한 방향으로 해소한다.
+  return {
+    pairs: pairs, grade: top[0], p: top[1], label: DR_LABELS[top[0]],
+    second: second[0], secondP: second[1],
+    close: close, action: close ? Math.max(top[0], second[0]) : top[0],
+    gateP: gateP
+  };
+}
+
 // 한 시나리오의 양안 추론. 비동기다 — 실제 모델은 동기로 호출할 수 없다.
+// 2단계는 1단계 결과에 의존하므로 병렬이 아니라 뒤에 이어 붙인다.
 function inferScenario(sc) {
   const one = (eye) => MODEL.infer(
     IMG + sc[eye + 'Image'],
     { labels: eye === 'os' ? sc.osLabels : sc.odLabels, seed: sc.scenario_no + eye }
   ).then(toPairs);
-  return Promise.all([one('os'), one('od')]).then(r => ({ os: r[0], od: r[1] }));
+
+  // 게이트: 그 눈의 D 유사도가 DR_GATE 를 넘지 않으면 2단계를 돌리지 않는다.
+  // 넘지 않은 눈에 등급을 붙이면 근거 없는 병기가 되므로 null 로 남긴다.
+  const grade = (eye, pairs) => {
+    const d = (pairs.find(x => x[0] === 'D') || [])[1] || 0;
+    if (d < DR_GATE) return Promise.resolve(null);
+    return DR_MODEL.infer(
+      IMG + sc[eye + 'Image'],
+      { grade: sc[eye === 'os' ? 'osDrGrade' : 'odDrGrade'], seed: sc.scenario_no + eye + 'dr' }
+    ).then(v => toGrade(v, d));
+  };
+
+  return Promise.all([one('os'), one('od')]).then(r =>
+    Promise.all([grade('os', r[0]), grade('od', r[1])]).then(g =>
+      ({ os: r[0], od: r[1], osDr: g[0], odDr: g[1] })));
 }
 
 // neighbors(sc, eye) → 유사 학습 사례. 임베딩 사전계산이 끝나면 kNN 결과로 교체한다.
@@ -594,56 +820,144 @@ function vitals(sc) {
   ];
 }
 
-function clinical(sc, osPreds, odPreds) {
-  const best = {};
-  [['os', osPreds], ['od', odPreds]].forEach(([eye, preds]) => {
-    preds.forEach(([code, p]) => {
-      if (code !== 'N' && p >= SUSPECT_MIN) best[code] = Math.max(best[code] || 0, p);
+// 임상 보조 정보. 소견을 하나로 좁히지 않는 것이 이 함수의 계약이다.
+//
+//  - 눈별 값을 지우지 않는다. 소견마다 "어느 눈에서 얼마로 보였는지"를 근거로 들고 다닌다.
+//    양안에서 같은 소견이 함께 나오는 경우가 오히려 드물고, 한쪽에만 나타나거나 양쪽이
+//    서로 다른 소견을 보이는 쪽이 흔하다. 대표값 하나로 접으면 그 정보가 사라진다.
+//  - 임계값을 넘은 소견은 전부 남긴다. 한 환자가 한 가지 병만 갖고 있다고 가정하지 않는다.
+//  - 협진만 과 단위로 묶는다(의뢰가 과 단위로 나가므로). 묶을 때 시급도는 가장 급한 것을
+//    남기고, 어떤 소견이 그 의뢰를 만들었는지 근거를 카드에 그대로 적는다.
+function clinical(sc, osPreds, odPreds, osDr, odDr) {
+  if (!osPreds.length && !odPreds.length) {
+    return { referrals: [], tests: [], systemic: [], notes: [] };   // 아직 추론 전
+  }
+
+  const pct = (v) => Math.round(v * 100) + '%';
+  const dr = { os: osDr, od: odDr };
+
+  // 소견별 근거 수집 — 눈별 값을 각각 보존한다.
+  const found = {};
+  [['os', osPreds], ['od', odPreds]].forEach(pair => {
+    pair[1].forEach(d => {
+      if (d[0] === 'N' || d[1] < SUSPECT_MIN) return;
+      (found[d[0]] || (found[d[0]] = { code: d[0], os: 0, od: 0 }))[pair[0]] = d[1];
     });
   });
-  const codes = Object.keys(best).sort((a, b) => best[b] - best[a]);
-
-  if (!osPreds.length && !odPreds.length) {
-    return { referrals: [], tests: [], systemic: [] };   // 아직 추론 전
-  }
+  const codes = Object.keys(found);
   if (!codes.length) {
-    return { referrals: [Object.assign({}, RULE_NORMAL)], tests: [], systemic: [] };
+    return { referrals: [Object.assign({}, RULE_NORMAL)], tests: [], systemic: [], notes: [] };
   }
+  const hiOf = (code) => Math.max(found[code].os, found[code].od);
 
-  const referrals = [], tests = [], systemic = [], seenTest = {}, byDept = {};
-  codes.forEach(code => {
+  // 그 소견이 어느 눈에서 얼마로 보였는지. D 면 눈별 등급까지 같이 적는다.
+  const evidence = (code) => ['os', 'od'].map(eye => {
+    if (!found[code][eye]) return null;
+    const head = (eye === 'os' ? 'OS ' : 'OD ') + pct(found[code][eye]);
+    if (code !== 'D' || !dr[eye]) return head;
+    const g = dr[eye];
+    return head + ' · ' + g.grade + '등급'
+      + (g.close ? ' (' + g.second + '등급과 근접 → ' + g.action + '등급 기준)' : '');
+  }).filter(Boolean).join('   ');
+
+  // D 의 시급도·사유는 등급에서 나온다. 두 눈의 등급이 다르면 더 심한 쪽을 따른다 —
+  // 한쪽이 증식성이면 그 환자는 증식성 환자다.
+  const drWorst = (() => {
+    const gs = ['os', 'od'].filter(e => found.D && found.D[e] && dr[e]).map(e => dr[e].action);
+    return gs.length ? DR_GRADE_RULES[Math.max.apply(null, gs)] : null;
+  })();
+
+  const referrals = [], tests = [], systemic = [], seenTest = {}, seenSys = {}, byDept = {};
+  const addTest = (t) => { if (!seenTest[t.code]) { seenTest[t.code] = 1; tests.push(t); } };
+
+  codes.sort((a, b) => hiOf(b) - hiOf(a)).forEach(code => {
     const r = RULES[code] || RULES.O;
-    const urgency = best[code] >= URGENT_AT ? r.urgent : r.normal;
-    // 같은 과가 여러 소견으로 중복되면 한 줄로 합치고 더 급한 시급도를 남긴다.
+    const urgency = (code === 'D' && drWorst)
+      ? drWorst.urgency
+      : (hiOf(code) >= URGENT_AT ? r.urgent : r.normal);
+    const reason = (code === 'D' && drWorst) ? drWorst.reason : r.reason;
+    const driver = (LABELS[code] || code) + ' — ' + evidence(code);
+
     if (byDept[r.dept]) {
       const prev = byDept[r.dept];
-      prev.reason += ' ' + r.reason;
-      if (urgency.indexOf('즉시') === 0) prev.urgency = urgency;
+      prev.urgency = moreUrgent(prev.urgency, urgency);   // 순서에 의존하지 않는다
+      prev.reasons.push({ label: LABELS[code] || code, text: reason });
+      prev.drivers.push(driver);
     } else {
-      byDept[r.dept] = { dept: r.dept, urgency: urgency, reason: r.reason };
+      byDept[r.dept] = { dept: r.dept, urgency: urgency, drivers: [driver],
+                         reasons: [{ label: LABELS[code] || code, text: reason }] };
       referrals.push(byDept[r.dept]);
     }
-    (r.tests || []).forEach(t => { if (!seenTest[t.code]) { seenTest[t.code] = 1; tests.push(t); } });
-    if (r.systemic) systemic.push(r.systemic);
+
+    (r.tests || []).forEach(addTest);
+    if (code === 'D' && drWorst) (drWorst.tests || []).forEach(addTest);
+    if (r.systemic && !seenSys[r.systemic.title]) { seenSys[r.systemic.title] = 1; systemic.push(r.systemic); }
   });
-  return { referrals: referrals, tests: tests, systemic: systemic };
+
+  // 급한 의뢰가 위로. 소견 유사도 순서가 아니라 시급도 순서다.
+  referrals.sort((a, b) => urgencyRank(a.urgency) - urgencyRank(b.urgency));
+  referrals.forEach(r => {
+    r.driverText = r.drivers.join('   ·   ');
+    // 한 과에 소견이 여럿 묶이면 사유마다 어느 소견의 것인지 앞에 붙인다. 붙이지
+    // 않으면 카드의 시급도가 어느 소견에서 왔는지 알 수 없어 사유끼리 모순되게 읽힌다
+    // (예: 시급도는 황반변성발 48시간인데 사유는 당뇨 1등급의 "연 1회 추적").
+    r.reason = r.reasons.length > 1
+      ? r.reasons.map(x => x.label + ' — ' + x.text).join('   ')
+      : r.reasons[0].text;
+  });
+
+  // 주의 노트. 소견을 하나로 좁히지 말라는 경고들을 목록으로 낸다.
+  const names = (a) => a.map(c => LABELS[c] || c).join(' + ');
+  const notes = [];
+
+  // (1) 동반 소견 — 한 환자가 한 가지 병만 갖고 있다고 가정하지 않는다.
+  if (codes.length > 1) {
+    const perEye = (eye) => codes.filter(c => found[c][eye] >= SUSPECT_MIN);
+    const o = perEye('os'), d = perEye('od');
+    const solo = codes.filter(c => !(found[c].os && found[c].od));
+    const parts = [];
+    if (o.length > 1) parts.push('좌안 ' + names(o));
+    if (d.length > 1) parts.push('우안 ' + names(d));
+    notes.push({
+      title: '소견 ' + codes.length + '건 동반 — 단일 진단으로 좁히지 마세요',
+      body: (parts.length ? '한 눈에 소견이 겹칩니다 (' + parts.join(' / ') + '). ' : '')
+        + (solo.length ? '한쪽 눈에서만 확인된 소견이 있습니다 (' + names(solo) + '). ' : '')
+        + '동반 질환은 서로의 예후를 악화시키고 치료 우선순위가 달라집니다. '
+        + '각 소견을 개별 의심 항목으로 유지하고, 협진 시 전부 함께 전달하세요.'
+    });
+  }
+
+  // (2) 양안 DR 등급 비대칭 — 더 심한 쪽으로 대응하지만 반대쪽이 안전한 것은 아니다.
+  if (found.D && dr.os && dr.od && dr.os.grade !== dr.od.grade) {
+    notes.push({
+      title: '양안 DR 등급이 다릅니다 — 좌안 ' + dr.os.grade + '등급 · 우안 ' + dr.od.grade + '등급',
+      body: '시급도는 더 심한 ' + Math.max(dr.os.action, dr.od.action) + '등급 기준으로 정했습니다. '
+        + '반대쪽 눈이 안전하다는 뜻이 아닙니다 — 등급이 낮은 눈도 같은 전신 위험을 공유하며 '
+        + '진행 속도가 다를 수 있으므로 두 눈을 각각 추적하세요.'
+    });
+  }
+
+  return { referrals: referrals, tests: tests, systemic: systemic, notes: notes };
 }
 
 // preds 가 null 이면 아직 추론 전이다. 화면 구조는 유지하고 값만 비운다 —
 // 실제 모델은 로딩·추론에 시간이 걸리므로 이 상태가 반드시 존재한다.
 function buildPatient(sc, preds) {
   const osPreds = (preds && preds.os) || [], odPreds = (preds && preds.od) || [];
-  const cl = clinical(sc, osPreds, odPreds);
+  // 2단계 결과. null 은 두 가지를 뜻할 수 있다 — 아직 추론 전이거나, D 유사도가
+  // DR_GATE 를 넘지 못해 돌리지 않았거나. 화면은 preds 유무로 둘을 구분한다.
+  const osDr = (preds && preds.osDr) || null, odDr = (preds && preds.odDr) || null;
+  const cl = clinical(sc, osPreds, odPreds, osDr, odDr);
   return {
     name: sc.displayName, ageSex: sc.age + '세 · ' + (sc.sex === 'Male' ? '남' : '여'),
     chartNo: sc.chartNo, visit: sc.visitDate, site: sc.site,
     vitals: vitals(sc),
     os: { file: sc.osSourceFile, quality: sc.osArtifact ? '보통 · ' + sc.osArtifact : '양호',
-          preds: osPreds, img: IMG + sc.osImage },
+          preds: osPreds, dr: osDr, img: IMG + sc.osImage },
     od: { file: sc.odSourceFile, quality: sc.odArtifact ? '보통 · ' + sc.odArtifact : '양호',
-          preds: odPreds, img: IMG + sc.odImage },
+          preds: odPreds, dr: odDr, img: IMG + sc.odImage },
     simOS: neighbors(sc, 'os', osPreds), simOD: neighbors(sc, 'od', odPreds),
-    referrals: cl.referrals, tests: cl.tests, systemic: cl.systemic,
+    referrals: cl.referrals, tests: cl.tests, systemic: cl.systemic, notes: cl.notes,
     patientLine: sc.patientLine
   };
 }
@@ -676,10 +990,12 @@ class Component extends DCLogic {
     this._fit();
 
     // 모델 로드 → 현재 시나리오 추론. 실제 모델은 여기서 수 초가 걸린다.
+    // 2단계 모델도 함께 받는다 — D 가 나온 뒤에 로드하면 화면이 두 번 기다린다.
     this.setState({ modelStatus: 'loading' });
-    MODEL.load().then(() => {
+    Promise.all([MODEL.load(), DR_MODEL.load()]).then(() => {
       if (!this._alive) return;
       MODEL.status = 'ready';
+      DR_MODEL.status = 'ready';
       this.setState({ modelStatus: 'ready' });
       this.infer(this.state.idx);
     }, (e) => {
@@ -736,30 +1052,44 @@ class Component extends DCLogic {
     };
   }
 
-  // 의심 소견 목록. 양안을 하나의 순위로 합치지 않고, 두 눈 중 어느 쪽이든
-  // SUSPECT_MIN 을 넘으면 전부 올린다 — 한쪽 눈에만 나타나는 소견이 있고,
-  // 복수 소견이 동반될 수 있으므로 1순위만 남기면 임상적으로 위험하다.
-  // 대표값은 평균이 아니라 max: 한쪽에서 강하게 보이면 그게 고려 대상이다.
-  suspects(p) {
+  // 의심 소견 — 눈별로 따로 낸다. 양안을 하나의 순위로 합치지 않는다.
+  //
+  // 합치지 않는 이유는 표시 취향이 아니다. 같은 소견이 양안에 함께 나타나는 경우가
+  // 오히려 드물고, 한쪽 눈에만 나타나거나 두 눈이 서로 다른 소견을 보이는 쪽이 흔하다.
+  // 대표값 하나로 접으면 "어느 눈을 봐야 하는가"가 사라지고, 한쪽 눈의 소견이
+  // 반대쪽 눈의 더 높은 값에 묻힌다. 그래서 그 눈에서 임계값을 넘은 소견은 전부,
+  // 그 눈의 항목으로 남긴다 — 순위를 매기는 것이 아니라 목록을 유지하는 것이다.
+  eyeSuspects(p, eye) {
+    const dr = p[eye].dr;
     const pct = (v) => Math.round(v * 100) + '%';
-    const at = (eye, code) => (p[eye].preds.find(d => d[0] === code) || [])[1] || 0;
-    const codes = [];
-    ['os', 'od'].forEach(eye => p[eye].preds.forEach(d => {
-      if (d[0] !== 'N' && codes.indexOf(d[0]) < 0) codes.push(d[0]);
-    }));
-    return codes.map(code => {
-      const os = at('os', code), od = at('od', code);
-      const hi = Math.max(os, od);
-      const both = os >= SUSPECT_MIN && od >= SUSPECT_MIN;
+    const other = eye === 'os' ? 'od' : 'os';
+    const otherAt = (code) => (p[other].preds.find(d => d[0] === code) || [])[1] || 0;
+
+    return p[eye].preds.filter(d => d[0] !== 'N' && d[1] >= SUSPECT_MIN).map(d => {
+      const code = d[0], isD = code === 'D';
+      const solo = otherAt(code) < SUSPECT_MIN;
       return {
         code: code,
         label: LABELS[code] || code,
-        hi: hi,
-        pctText: pct(hi),
-        eyes: 'OS ' + (os ? pct(os) : '—') + '   OD ' + (od ? pct(od) : '—'),
-        side: both ? '양안' : (os >= od ? '좌안 단독' : '우안 단독')
+        pctText: pct(d[1]),
+        // 반대쪽 눈에 없는 소견임을 적는다 — 이 눈만의 소견이라는 뜻이지,
+        // 덜 중요하다는 뜻이 아니다.
+        soloTag: solo ? '이 눈에서만' : '양안 공통',
+        // 2단계는 D 행에만 붙는다. 게이트를 넘지 못했으면 그 사실을 적는다.
+        drShow: isD ? 'flex' : 'none',
+        drText: !isD ? '' : (dr
+          ? dr.grade + '등급 · ' + (DR_LABELS[dr.grade] || '') + '  ' + pct(dr.p)
+          : '중증도 미측정'),
+        drNote: !isD ? '' : (dr
+          ? (dr.close
+              ? '2위 ' + dr.second + '등급 ' + pct(dr.secondP) + ' 와 근접 — 인접 등급은 사진만으로 '
+                + '구분이 어렵습니다. 더 심한 ' + dr.action + '등급 기준으로 대응합니다.'
+              : '2위 ' + dr.second + '등급 ' + pct(dr.secondP) + ' · 1단계 D 유사도 ' + pct(dr.gateP)
+                + ' 조건부')
+          : 'D 유사도가 ' + pct(DR_GATE) + ' 미만이라 2단계를 돌리지 않았습니다. '
+            + '근거 없는 병기를 붙이지 않기 위한 게이트입니다.')
       };
-    }).filter(d => d.hi >= SUSPECT_MIN).sort((a, b) => b.hi - a.hi);
+    });
   }
 
   // 정상 소견은 의심 목록의 경쟁자가 아니라 반대 근거로 따로 적는다.
@@ -773,9 +1103,12 @@ class Component extends DCLogic {
 
   // 이웃 라벨 일치도 — 유사 사례 3장의 확정 진단이 그 눈의 1순위 추정과 몇 개 일치하는지.
   // 임베딩 이웃이 엇갈리면 그 자체가 애매한 케이스라는 신호다.
+  // 추론 전에는 preds 가 빈 배열이다. 이 상태는 실제 모델에서 반드시 존재하므로
+  // 1순위를 꺼내는 코드는 전부 빈 배열을 견뎌야 한다 — 여기서 터지면 첫 렌더가 죽는다.
   agree(p, eye) {
-    const top = p[eye].preds[0][0];
     const list = eye === 'os' ? p.simOS : p.simOD;
+    if (!p[eye].preds.length) return '—';
+    const top = p[eye].preds[0][0];
     return list.filter(c => c.code === top).length + '/' + list.length;
   }
 
@@ -795,19 +1128,37 @@ class Component extends DCLogic {
   }
 
   summaryText(p) {
+    // 눈별 블록. 소견을 합치지 않는 화면의 구조를 텍스트에서도 유지한다 —
+    // 의뢰서에 "양안 최대 71%" 만 남으면 어느 눈을 먼저 볼지 알 수 없다.
+    const eyeBlock = (eye) => {
+      const list = this.eyeSuspects(p, eye);
+      const head = '[' + (eye === 'os' ? '좌안 OS' : '우안 OD') + '] 화질 ' + p[eye].quality
+        + ' · 이웃 라벨 일치 ' + this.agree(p, eye);
+      if (!p[eye].preds.length) return [head, '  - 추정 전 (모델 로딩·추론 중)'];
+      if (!list.length) return [head, '  - 분류 대상 소견 없음'];
+      return [head].concat(list.map(d => {
+        const line = '  - ' + d.label + ' ' + d.pctText + ' (' + d.soloTag + ')';
+        if (d.code !== 'D') return line;
+        return line + '\n      2단계 중증도: ' + d.drText + ' — ' + d.drNote;
+      }));
+    };
+
     return [
       '[망막 영상 AI 판독 보조 요약 — 진단 아님]',
       '환자: ' + p.name + ' (' + p.ageSex + ') / ' + p.chartNo + ' / ' + p.visit + ' ' + p.site,
       '참고: ' + p.vitals.map(v => v.k + ' ' + v.v).join(' · '),
       '',
-      '의심 소견 (양안 전체 — 한쪽 눈에만 나타난 소견도 포함):',
-      ...this.suspects(p).map(d => '  - ' + d.label + ' 최대 ' + d.pctText + ' [' + d.side + '] ' + d.eyes.replace(/\s+/g, ' ')),
+      '의심 소견 — 눈별로 분리. 양안을 하나의 순위로 합치지 않았습니다.',
+      '한쪽 눈에만 나타난 소견도 전부 개별 항목이며, 한 눈에 여러 소견이 동반될 수 있습니다.',
+      ...eyeBlock('os'),
+      ...eyeBlock('od'),
       '  ' + this.normalLine(p),
-      '좌안(OS) 1순위: ' + LABELS[p.os.preds[0][0]] + ' ' + Math.round(p.os.preds[0][1] * 100) + '% (화질 ' + p.os.quality + ', 이웃 라벨 일치 ' + this.agree(p, 'os') + ')',
-      '우안(OD) 1순위: ' + LABELS[p.od.preds[0][0]] + ' ' + Math.round(p.od.preds[0][1] * 100) + '% (화질 ' + p.od.quality + ', 이웃 라벨 일치 ' + this.agree(p, 'od') + ')',
+      ...p.notes.reduce((a, n) => a.concat(['', '※ ' + n.title, '  ' + n.body]), []),
       '',
-      '권장 협진:',
-      ...p.referrals.map(r => '  - ' + r.dept + ' [' + r.urgency + '] ' + r.reason),
+      '권장 협진 (시급도 순):',
+      ...p.referrals.map(r => '  - ' + r.dept + ' [' + r.urgency + ']'
+        + (r.driverText ? '\n      근거: ' + r.driverText.replace(/\s{2,}/g, ' ') : '')
+        + '\n      ' + r.reason),
       '',
       '추가 검사 권고:',
       ...p.tests.map(t => '  - ' + t.code + ' ' + t.name + ' — ' + t.why),
@@ -830,11 +1181,14 @@ class Component extends DCLogic {
     const z = this.state.z;
     const tf = (e) => 'translate(' + z[e].x + 'px, ' + z[e].y + 'px) scale(' + z[e].s + ')';
 
+    // 추론 전에는 1순위가 없다. 그때는 일치 여부를 판정하지 않고 비워 둔다 —
+    // 값이 없는 것과 불일치는 다른 상태다.
+    const top1 = (eye) => p[eye].preds.length ? p[eye].preds[0] : null;
     const card = (eye) => (c, i) => Object.assign({}, c, {
       rank: i + 1,
       eyeCode: EYE[eye].code,
-      match: c.code === p[eye].preds[0][0] ? '라벨 일치' : '라벨 불일치',
-      matchDim: c.code === p[eye].preds[0][0] ? 1 : 0.55,
+      match: !top1(eye) ? '추정 전' : (c.code === top1(eye)[0] ? '라벨 일치' : '라벨 불일치'),
+      matchDim: !top1(eye) ? 0.55 : (c.code === top1(eye)[0] ? 1 : 0.55),
       onClick: () => this.setState({
         compare: Object.assign({}, c, {
           rank: i + 1,
@@ -842,7 +1196,9 @@ class Component extends DCLogic {
           eyeCode: EYE[eye].code,
           curImg: p[eye].img,
           curFile: p[eye].file,
-          curDx: (LABELS[p[eye].preds[0][0]] || '') + ' ' + Math.round(p[eye].preds[0][1] * 100) + '%',
+          curDx: top1(eye)
+            ? (LABELS[top1(eye)[0]] || '') + ' ' + Math.round(top1(eye)[1] * 100) + '%'
+            : '추정 전',
           note: '이 학습 사례는 확정 진단된 영상입니다. 유사도 ' + c.sim + '는 모델 임베딩 공간상의 거리이며, 동일 진단을 의미하지 않습니다. 병변의 위치·범위·화질 차이를 직접 대조해 판단하세요.'
         })
       })
@@ -851,6 +1207,25 @@ class Component extends DCLogic {
     const chip = (on) => 'font-family: var(--font-heading); font-weight: 500; font-size: 12px; line-height: 1.2; padding: var(--space-1) var(--space-3); border-radius: var(--radius-md); cursor: pointer; background: transparent; border: 1px solid ' + (on
       ? 'var(--color-accent); color: var(--color-accent-300);'
       : 'var(--color-divider); color: var(--color-neutral-300);');
+
+    const susOS = this.eyeSuspects(p, 'os'), susOD = this.eyeSuspects(p, 'od');
+
+    // 사진 위 2단계 표시. 여기도 accent 단색이다 — 위험도를 색으로 말하지 않는다.
+    // 등급 숫자를 빨갛게 물들이면 확진처럼 읽힌다.
+    const drOverlay = (eye) => {
+      const g = p[eye].dr;
+      if (!g) return { show: 'none', label: '', pct: '', sub: '' };
+      return {
+        show: 'flex',
+        label: g.grade + '등급 · ' + (DR_LABELS[g.grade] || ''),
+        pct: Math.round(g.p * 100) + '%',
+        sub: g.close
+          ? g.second + '등급 ' + Math.round(g.secondP * 100) + '% 근접 → ' + g.action + '등급 기준'
+          : '2위 ' + g.second + '등급 ' + Math.round(g.secondP * 100) + '%'
+      };
+    };
+
+    const drOS = drOverlay('os'), drOD = drOverlay('od');
 
     const v = this.state.viewer;
     const viewer = v ? {
@@ -861,6 +1236,10 @@ class Component extends DCLogic {
       quality: p[v].quality,
       agree: this.agree(p, v),
       preds: this.pred(p[v].preds),
+      drShow: (v === 'os' ? drOS : drOD).show,
+      drLabel: (v === 'os' ? drOS : drOD).label,
+      drPct: (v === 'os' ? drOS : drOD).pct,
+      drSub: (v === 'os' ? drOS : drOD).sub,
       img: p[v].img,
       tf: tf(v),
       zoomLabel: z[v].s.toFixed(1) + '×',
@@ -878,13 +1257,19 @@ class Component extends DCLogic {
         os: Object.assign({}, p.os, { preds: this.pred(p.os.preds) }),
         od: Object.assign({}, p.od, { preds: this.pred(p.od.preds) })
       }),
-      modelTag: this.props.modelTag ?? (function (st) {
-        const set = ' · 라벨셋 {' + LABEL_ORDER.join(',') + '}';
+      // props.modelTag 는 수동 override 용이고 기본값은 비어 있다. ?? 대신 || 를 쓰는
+      // 이유는 빈 문자열도 "값 없음"으로 봐야 하기 때문이다 — 여기에 고정 문구가 박히면
+      // 모델 로딩·추정 중·목업 여부가 화면에서 사라지고, 없는 모델 버전을 주장하게 된다.
+      modelTag: this.props.modelTag || (function (st) {
+        // 2단계는 조건부라 항상 돌지 않는다. 라벨셋 뒤에 게이트를 같이 적어
+        // "등급이 없는 눈"이 오류가 아니라 설계라는 것을 화면에서 알 수 있게 한다.
+        const set = ' · 1단계 {' + LABEL_ORDER.join(',') + '} → D ≥ '
+          + Math.round(DR_GATE * 100) + '% 인 눈만 2단계 {' + DR_GRADE_ORDER.join(',') + '}';
         if (st.modelStatus === 'error') return '모델 오류 — ' + st.modelError;
         if (st.modelStatus === 'loading') return '모델 로딩 중' + set;
         if (!preds) return '추정 중' + set;
         return (MODEL.status === 'mock' || MODEL.status === 'ready' && !MODEL.net
-                ? '목업 추정 · 모델 미연결' : 'retina-cls · TF.js') + set;
+                ? '목업 추정 · 모델 미연결' : 'retina-cls + dr-grade · TF.js') + set;
       })(this.state),
       picker: this.state.picker,
       togglePicker: () => this.setState(st => ({ picker: !st.picker })),
@@ -922,10 +1307,30 @@ class Component extends DCLogic {
       }),
       // 패널 순서(OS 왼쪽 / OD 오른쪽)와 같게 — 5-7번은 왼쪽 패널(OS), 8-10번은 오른쪽 패널(OD)의 이웃.
       simCases: p.simOS.map(card('os')).concat(p.simOD.map(card('od'))),
-      suspects: this.suspects(p),
+      // 눈별 두 블록. 하나의 목록으로 합치지 않는다.
+      suspectsOS: susOS,
+      suspectsOD: susOD,
+      // 추론 전에 "소견 없음" 이라고 쓰면 없는 결과를 말하는 것이 된다.
+      // 아직 모르는 것과 확인해서 없는 것은 다른 상태다.
+      osCount: !preds ? '추정 중' : (susOS.length ? susOS.length + '건' : '소견 없음'),
+      odCount: !preds ? '추정 중' : (susOD.length ? susOD.length + '건' : '소견 없음'),
+      osEmptyShow: (preds && !susOS.length) ? 'block' : 'none',
+      odEmptyShow: (preds && !susOD.length) ? 'block' : 'none',
+      emptyText: '이 눈에서는 임계값을 넘은 분류 대상 소견이 확인되지 않았습니다. '
+        + '반대쪽 눈의 소견과 무관하게 판단한 결과입니다.',
       normalLine: this.normalLine(p),
+      notes: p.notes,
       agreeOS: this.agree(p, 'os'),
       agreeOD: this.agree(p, 'od'),
+      // 사진 위 2단계 오버레이. 게이트를 넘은 눈에만 뜬다.
+      osDrShow: drOS.show,
+      osDrLabel: drOS.label,
+      osDrPct: drOS.pct,
+      osDrSub: drOS.sub,
+      odDrShow: drOD.show,
+      odDrLabel: drOD.label,
+      odDrPct: drOD.pct,
+      odDrSub: drOD.sub,
       // 시급도는 이 화면에서 채도를 쓰는 유일한 자리다. 3단(빨강/주황/파랑) 채움을
       // 2단 선으로 줄였다 — 긴급만 색으로 표시하고, 나머지 단계는 문구가 이미 말한다.
       referrals: p.referrals.map(r => {
