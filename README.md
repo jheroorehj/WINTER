@@ -70,6 +70,9 @@
 ```
 WINTER/
 ├─ index.html                        배포 진입점 (프로토타입으로 연결)
+├─ data/
+│  ├─ scenarios.csv                   시연 시나리오 7건 (환자 정보 + 눈별 라벨)
+│  └─ images/                         시나리오별 안저 영상 14장 (512×512)
 ├─ frontend/project/
 │  ├─ 망막분석 EMR.dc.html             ★ 주 설계 파일 (프로토타입 + 로직)
 │  ├─ support.js                      프로토타입 런타임 (x-dc)
@@ -115,6 +118,40 @@ frontend/project/sample/
 > - 홀드아웃 분할 방식
 
 시연에는 학습에 쓰지 않고 떼어 둔 홀드아웃 일부를 사용합니다.
+
+### 시연 시나리오 — `data/scenarios.csv`
+
+홀드아웃 525명에서 7건을 골랐습니다. 각 시나리오가 UI 설계 결정 하나씩을 증명하도록 구성했습니다.
+
+| # | 시나리오 | OS / OD | 증명하는 것 | 라이브 |
+| --- | --- | --- | --- | --- |
+| 1 | 양안 정상 | N / N | 정상일 때 정상이라고 말한다 — 과경보 없음 | ○ |
+| 2 | 단안 단일 소견 | N / G | 한쪽 눈에만 나타나는 질환. 무증상 진행 | ○ |
+| 3 | 단안 복수 소견 | N / A+D | 한 눈에 두 소견 — 1순위만 남기지 않는 근거 | ○ |
+| 4 | 양안 동일 소견 | D / D | 양안 대칭은 전신질환 신호 | |
+| 5 | 양안 서로 다른 소견 | D / H | 양안을 한 순위로 합치면 깨지는 케이스 | ○ |
+| 6 | 양안 모두 복수 소견 | D+G / D+G | 소견 4개를 순위로 누르지 않고 보여주기 | |
+| 7 | 라벨셋 밖 소견 | C / C | 6클래스에 없는 소견 — 모델의 한계 | ○ |
+
+**눈별 라벨은 파생값입니다.** 데이터셋의 `N,D,G,C,A,H,M,O` 8개 컬럼은 환자 단위이고 눈별 정보는 자유 텍스트 진단 키워드에만 있습니다. 그래서 단일라벨 + 양안 키워드 동일 환자만 골라 키워드→클래스 매핑을 역추론했고(18종 전부 100% 일관), 그 매핑으로 눈별 라벨을 만들었습니다. `drusen` 은 A 가 아니라 O 로 떨어집니다. 검증할 수 있도록 원문 키워드를 `os_keywords` / `od_keywords` 에 그대로 남겼습니다.
+
+**실제 데이터는 나이·성별·영상·라벨뿐입니다.** 화면 상단의 혈압·HbA1c·기저질환·교정시력·복용약, 그리고 환자명·차트번호·방문일·기관명·환자 설명 문장은 모두 **생성한 가상 정보**입니다. 각 시나리오의 실제 라벨과 임상적으로 정합되게 만들었습니다(당뇨망막병증 케이스에 HbA1c 상승, 고혈압성 케이스에 혈압 상승 등). 어느 열이 가상인지는 CSV 의 `clinical_fields_synthetic` 열에 명시돼 있습니다.
+
+주요 열:
+
+```
+scenario_no  scenario_key  scenario_name  demo_primary  proves
+patient_id  age  sex  patient_level_labels                    ← 실제
+os_image  od_image  os_labels  od_labels                      ← 실제(라벨은 파생)
+os_keywords  od_keywords  os_artifact  od_artifact            ← 실제 원문(역추적용)
+os_source_file  od_source_file                                ← 실제 원본 파일명
+display_name  chart_no  visit_date  site                      ← 가상
+weight_bmi  blood_pressure  hba1c  history                    ← 가상
+corrected_vision  medication  vital_notes  patient_line        ← 가상
+clinical_fields_synthetic                                     ← 가상 열 목록
+```
+
+모델 학습이 끝나면 이 CSV 를 프로토타입에 연결합니다. 아직 연결하지 않았습니다.
 
 ---
 
