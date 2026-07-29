@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "img_size": 224,
+  "fov_crop": true,
+  "square_pad": true,
+  "histogram_match": true,
+  "color_match_blend": 1.0,
+  "clahe": true,
+  "clahe_green_only": true,
+  "clahe_clip_limit": 2.0,
+  "clahe_grid": [
+    8,
+    8
+  ],
+  "imagenet_mean": [
+    0.485,
+    0.456,
+    0.406
+  ],
+  "imagenet_std": [
+    0.229,
+    0.224,
+    0.225
+  ]
+}

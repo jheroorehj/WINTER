@@ -17,7 +17,24 @@ Thumbs.db
 .vscode/
 __pycache__/
 
-# ── 모델 산출물 (추후 학습 결과물이 들어올 자리) ──────────────────
+# ── 모델 산출물 ────────────────────────────────────────────────────
+# 가중치와 계약을 나눠서 관리한다.
+#
+#   가중치(*.onnx, 수십 MB)  → 저장소 밖. Hugging Face Hub 에 올리고 런타임에 받는다.
+#     재학습마다 통째로 바뀌므로 git 에 넣으면 갈아탄 세대가 전부 히스토리에 남는다
+#     (모델 2개 × 3세대 ≈ 170MB). Git LFS 는 무료 대역폭이 월 1GB 라 28MB 모델이면
+#     방문 35회에 소진돼 시연 중에 끊긴다.
+#
+#   계약(preprocessing·postprocessing·labels·color_reference·manifest, 합계 31KB)
+#     → 저장소 안. 화면 로직이 이 값에 직접 의존한다. 특히 postprocessing 의
+#     클래스별 threshold 가 바뀌면 의심 소견 판정이 바뀌므로 코드와 같은 커밋에
+#     묶여 있어야 한다.
+data/model*/*.onnx
+data/model*/*.onnx.data
+
+# 배포 번들 zip. 풀어서 쓰므로 zip 자체는 추적하지 않는다.
+# docs/ 의 핸드오프 zip 은 추적 중이라 *.zip 전역 패턴은 쓰지 않는다.
+/stage1_odir_vercel_bundle.zip
 *.h5
 *.ckpt
 *.pth

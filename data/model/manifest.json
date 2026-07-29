@@ -1,0 +1,27 @@
+[
+  {
+    "file": "stage1_odir_convnextv2_tiny_color_reference.json",
+    "size_mb": 0.03,
+    "sha256": "1a9120d3384568ff3d30e82f6f9a3a99c21876fc6940edca645c5f4a63d17723"
+  },
+  {
+    "file": "stage1_odir_convnextv2_tiny_int8.onnx",
+    "size_mb": 28.456,
+    "sha256": "c59259ed49add07b7fd97865f9be255e353196269bf3cee2750eb4c9ad55a2d0"
+  },
+  {
+    "file": "stage1_odir_convnextv2_tiny_labels.txt",
+    "size_mb": 0.0,
+    "sha256": "72b5b2ea5f5fd2e623be9d3a73d0bfa52434e94cd2fd5f359543808867fb3d2e"
+  },
+  {
+    "file": "stage1_odir_convnextv2_tiny_postprocessing.json",
+    "size_mb": 0.0,
+    "sha256": "29d2e8895ff349448286d606e446ab82535642896cef5686fa605e1b8631ccfd"
+  },
+  {
+    "file": "stage1_odir_convnextv2_tiny_preprocessing.json",
+    "size_mb": 0.0,
+    "sha256": "941904f74ce899565f271e74a0cc8e27610d507fb4ab9cdcd7968684339c3f1f"
+  }
+]

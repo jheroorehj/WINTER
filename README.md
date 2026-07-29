@@ -119,7 +119,8 @@ WINTER/
 │  ├─ build.py                        라벨 → 시나리오 빌드 (CSV·JSON·영상·주입)
 │  ├─ scenarios.csv                   시연 시나리오 10건 (환자 정보 + 눈별 라벨 + DR 등급)
 │  ├─ scenarios.json                  같은 내용의 기계 판독용 사본 + 두 모델의 계약
-│  └─ images/                         시나리오별 안저 영상 20장
+│  ├─ images/                         시나리오별 안저 영상 20장
+│  └─ model/                          1단계 계약 메타 31KB (가중치는 HF Hub)
 ├─ frontend/project/
 │  ├─ 망막분석 EMR.dc.html             ★ 주 설계 파일 (프로토타입 + 로직)
 │  ├─ support.js                      프로토타입 런타임 (x-dc)
@@ -308,14 +309,65 @@ const DR_CONDITIONAL_ONLY = true;                      // 등급은 단독 결�
 
 1단계는 다중라벨이지만 **2단계는 반드시 단일라벨(softmax)로 학습해야 합니다.** 한 눈이 경증이면서 동시에 증식성일 수는 없습니다 — 병기는 하나입니다. 2단계까지 sigmoid 로 학습하면 등급이 서로를 배제하지 않아 "2등급 0.7 · 3등급 0.6" 처럼 해석 불가능한 출력이 나옵니다.
 
-두 모델의 전처리 입력 크기는 둘 다 224 이지만 **같은 모델이 아니므로 가중치를 공유하지 않습니다.** 산출물은 `data/model/`(1단계)과 `data/model-dr/`(2단계)로 나뉩니다. 둘 다 아직 없습니다.
+두 모델의 전처리 입력 크기는 둘 다 224 이지만 **같은 모델이 아니므로 가중치를 공유하지 않습니다.** 산출물은 `data/model/`(1단계)과 `data/model-dr/`(2단계)로 나뉩니다. 1단계는 들어왔고 2단계는 아직 없습니다.
+
+#### 가중치는 저장소에 넣지 않습니다
+
+가중치와 계약을 나눠서 관리합니다.
+
+| | 위치 | 이유 |
+| --- | --- | --- |
+| **가중치** `*.onnx` (수십 MB) | **Hugging Face Hub** — 런타임에 받습니다 | 재학습마다 통째로 바뀝니다. git 에 넣으면 갈아탄 세대가 전부 히스토리에 남습니다(모델 2개 × 3세대 ≈ 170MB). Git LFS 는 무료 대역폭이 월 1GB 라 28MB 모델이면 방문 35회에 소진돼 **시연 중에 끊깁니다** |
+| **계약** 메타데이터 (합계 31 KB) | 저장소 안 `data/model/` | 화면 로직이 이 값에 직접 의존합니다. 특히 클래스별 threshold 가 바뀌면 의심 소견 판정이 바뀌므로 코드와 같은 커밋에 묶여 있어야 합니다 |
+
+가중치를 외부에서 받아도 **환자 영상은 여전히 단말을 벗어나지 않습니다.** 내려받는 것은 가중치뿐이고 추론은 브라우저 안에서 끝납니다. 받은 파일은 `manifest.json` 의 SHA-256 과 대조해 확인하세요.
+
+```
+data/model/                                        ← 저장소 (31 KB)
+  manifest.json                                     파일별 SHA-256
+  stage1_odir_convnextv2_tiny_labels.txt            N D G A H O
+  stage1_odir_convnextv2_tiny_preprocessing.json
+  stage1_odir_convnextv2_tiny_postprocessing.json
+  stage1_odir_convnextv2_tiny_color_reference.json  histogram match 기준 (30 KB)
+  stage1_odir_convnextv2_tiny_int8.onnx             ← .gitignore 대상 (28.5 MB)
+
+Hugging Face Hub                                   ← 가중치만
+  stage1_odir_convnextv2_tiny_int8.onnx
+  (2단계 가중치도 같은 자리에)
+```
+
+#### 1단계 산출물 (들어옴, 아직 미연결)
+
+`stage1_odir_convnextv2_tiny_int8.onnx` (28.5 MB, ConvNeXt V2-Tiny int8 양자화) + 메타데이터 4종. `manifest.json` 의 SHA-256 다섯 개를 전부 대조해 무결성을 확인했습니다.
+
+**라벨 순서는 `N,D,G,A,H,O` 로 화면 계약과 정확히 일치**하고 입력도 224 다중라벨입니다. 그러나 **런타임과 전·후처리가 현재 코드의 전제와 다릅니다.**
+
+| | 프로토타입 현재 계약 | 실제 산출물 |
+| --- | --- | --- |
+| 런타임 | `tf.loadLayersModel` (TF.js) | **ONNX** → `onnxruntime-web` 필요 |
+| 정규화 | `scale: 1/255`, mean·std 없음 | **ImageNet mean·std** + FOV crop + square pad + histogram match + CLAHE(green 채널만, clip 2.0, grid 8×8) |
+| 출력 처리 | sigmoid 원값 그대로 | **클래스별 temperature scaling** 후 **클래스별 threshold** |
+
+후처리 파라미터(`stage1_odir_convnextv2_tiny_postprocessing.json`):
+
+```
+temperature  N 1.34  D 5.00  G 0.71  A 0.75  H 5.00  O 5.00
+threshold    N 0.58  D 0.52  G 0.92  A 0.87  H 0.55  O 0.55   (temperature 적용 후 공간)
+d_target_recall 0.95
+```
+
+연결할 때 반영해야 하는 것 세 가지입니다.
+
+1. **`SUSPECT_MIN = 0.15` 단일 임계값을 클래스별 threshold 로 교체해야 합니다.** 0.15 를 그대로 쓰면 threshold 가 0.92 인 녹내장에서 대량 과경보가 납니다.
+2. **`DR_GATE` 를 D threshold(0.524)에 묶습니다.** 현재 값 0.5 는 임의로 정한 것이고, 0.524 는 `d_target_recall: 0.95` 로 보정된 값입니다.
+3. **전처리 재현이 가장 큰 위험입니다.** CLAHE·FOV crop·histogram match 를 브라우저에서 되살려야 하고, 하나라도 어긋나면 추론이 **조용히** 틀립니다. `stage1_odir_convnextv2_tiny_color_reference.json`(30 KB)이 histogram match 기준값이므로 배포에 함께 포함해야 합니다.
 
 > [!WARNING]
 > **2단계 학습·시연 데이터가 겹치면 안 됩니다.** 저장소에 있는 `Diabetic retinopathy/` 65장은 파일명이 `*test.jpg` 로 IDRiD 의 테스트 분할입니다. 학습에는 IDRiD 학습 분할을 따로 받아 쓰고, 이 65장은 홀드아웃으로만 유지하세요. 이 65장으로 학습한 뒤 같은 장으로 시연하면 화면의 등급은 암기값이며 정확도 주장이 무효가 됩니다.
 
 **추론은 비동기이고, 그 상태가 화면에 있습니다.** 예측값은 `renderVals()` 에서 계산하지 않고 컴포넌트 상태(`state.preds`)에 시나리오별로 담깁니다. 실제 모델은 로딩과 추론에 시간이 걸리므로 `모델 로딩 중` / `추정 중` / `모델 오류` 상태가 존재하며, 이때 화면은 구조를 유지한 채 값만 비웁니다. 소견이 없는 것(`정기 검진 · 1년 내 재촬영`)과 아직 추론 전인 것은 구분됩니다.
 
-모델 산출물은 `data/model/model.json` (+ 가중치 샤드) 위치를 예상합니다. 아직 없습니다.
+1단계 계약 메타데이터는 `data/model/` 에 있고 가중치는 Hugging Face Hub 에서 받습니다. `MODEL_URL` 이 가리키는 `data/model/model.json` 은 TF.js·저장소 내 경로를 전제한 값이라 실제와 다릅니다 — 연결 시 위의 계약 차이 표와 함께 이 경로도 고쳐야 합니다.
 
 우측 패널의 권장 협진·추가 검사·전신질환 경고는 시나리오별로 손으로 쓰지 않고 `RULES` 테이블에서 **검출된 라벨로부터 파생**됩니다. 그래서 시나리오를 추가해도 우측 패널이 자동으로 채워집니다. 같은 과가 여러 소견으로 중복되면 한 줄로 합치고 더 급한 시급도를 남깁니다. 소견이 없으면 `정기 검진 · 1년 내 재촬영` 으로 떨어집니다 — 정상이라고 말하는 것도 결과이므로 화면이 비지 않습니다.
 
