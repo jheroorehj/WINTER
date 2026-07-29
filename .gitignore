@@ -4,7 +4,7 @@ archive/
 
 # 프로토타입 화면 확인용으로 데이터셋에서 복사해 둔 안저 샘플.
 # 로컬에서만 두고 쓴다 — 복원 방법은 README 의 "데모 이미지" 항목 참고.
-ai/project/uploads/fundus/
+frontend/project/uploads/fundus/
 
 # ── OS / 편집기 ──────────────────────────────────────────────────
 .DS_Store

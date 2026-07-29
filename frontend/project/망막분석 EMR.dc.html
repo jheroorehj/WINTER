@@ -670,7 +670,7 @@ class Component extends DCLogic {
           ? 'color: var(--color-accent-300); box-shadow: inset 0 0 0 1px var(--color-accent);'
           : 'color: var(--color-neutral-300);')
       })),
-      // 패널 순서(OS 왼쪽 / OD 오른쪽)와 같게 — 5~7번은 왼쪽 패널(OS), 8~10번은 오른쪽 패널(OD)의 이웃.
+      // 패널 순서(OS 왼쪽 / OD 오른쪽)와 같게 — 5-7번은 왼쪽 패널(OS), 8-10번은 오른쪽 패널(OD)의 이웃.
       simCases: p.simOS.map(card('os')).concat(p.simOD.map(card('od'))),
       suspects: this.suspects(p),
       normalLine: this.normalLine(p),

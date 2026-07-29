@@ -41,7 +41,7 @@
 데스크톱(1920×1080) 단일 화면 EMR 입니다.
 
 <p align="center">
-  <img src="./UI_%EC%BB%B4%ED%8F%AC%EB%84%8C%ED%8A%B8.jpeg" alt="WINTER 화면 구성 와이어프레임 — 컴포넌트 1~10" width="880">
+  <img src="./UI_%EC%BB%B4%ED%8F%AC%EB%84%8C%ED%8A%B8.jpeg" alt="WINTER 화면 구성 와이어프레임 — 컴포넌트 1-10" width="880">
 </p>
 
 - **1** — 환자명, 나이·성별, 차트번호, 그리고 판단에 필요한 참고 수치만 선별 표시(혈압·HbA1c·기저질환·교정시력 등).
@@ -69,14 +69,14 @@
 
 ```
 WINTER/
-├─ ai/
+├─ frontend/
 │  ├─ README.md                      코딩 에이전트용 핸드오프 안내
 │  └─ project/
 │     ├─ 망막분석 EMR.dc.html          ★ 주 설계 파일 (프로토타입 + 로직)
 │     ├─ support.js                   프로토타입 런타임 (x-dc)
 │     ├─ _ds/nocturne-…/              디자인 시스템 (styles.css + 가이드)
 │     └─ uploads/                     와이어프레임, 데모 이미지
-├─ UI_컴포넌트.jpeg                    손그림 와이어프레임 (컴포넌트 1~10)
+├─ UI_컴포넌트.jpeg                    손그림 와이어프레임 (컴포넌트 1-10)
 ├─ WINTER.png / WINTER 2.png          로고
 └─ 의료진용 …-handoff.zip              원본 핸드오프 번들 (출처 보존용)
 ```
@@ -88,7 +88,7 @@ WINTER/
 프로토타입 화면 확인용 안저 샘플 8장은 데이터셋에서 복사해 쓰는 것이라 저장소에 포함하지 않습니다(`.gitignore`). 로컬에서 화면을 보려면 데이터셋에서 8장을 아래 경로에 넣으면 됩니다.
 
 ```
-ai/project/uploads/fundus/
+frontend/project/uploads/fundus/
   0_left.jpg   0_right.jpg        ← 3·4번 현재 환자 좌/우안
   1_left.jpg   10_left.jpg   100_left.jpg     ← 5·6·7번 좌안 유사 사례
   1_right.jpg  10_right.jpg  100_right.jpg    ← 8·9·10번 우안 유사 사례
@@ -116,7 +116,7 @@ ai/project/uploads/fundus/
 
 ## 현재 상태
 
-- [x] 화면 설계 확정 (컴포넌트 1~10, 단일 데스크톱 화면)
+- [x] 화면 설계 확정 (컴포넌트 1-10, 단일 데스크톱 화면)
 - [x] 인터랙션 프로토타입 (확대 뷰어, 유사 사례 비교, 소견 요약 복사)
 - [x] 의심 소견 파생 로직 — 양안 합산, 단안·동반 소견 보존
 - [x] 이웃 라벨 일치도 표시
