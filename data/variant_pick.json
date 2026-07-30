@@ -1,0 +1,348 @@
+{
+ "maxVariants": 5,
+ "liveGraded": 1,
+ "livePlain": 4,
+ "note": "시나리오마다 가장 결과 좋은 변형을 골랐다. live=true 는 심사에서 보여줄 구성으로, 2단계 등급을 맞힌 1건과 중증도가 화면에 끼어들지 않는 4건이다. 고른 케이스는 전체를 대표하지 않으므로 홀드아웃 전체 수치(verify_models.py SUMMARY)를 함께 제시할 것.",
+ "pick": {
+  "4": {
+   "k": 3,
+   "patient_id": "411",
+   "age": "57",
+   "sex": "Male",
+   "patient_level_labels": "D",
+   "live": true,
+   "score": 110.646,
+   "stage2_hit": 1,
+   "stage2_total": 2,
+   "stage1_hit": 1,
+   "eyes": {
+    "os": {
+     "image": "v4-3-os.jpg",
+     "dataset": "IDRiD",
+     "labels": "D",
+     "grade": 2,
+     "grade_source": "idrid_folder",
+     "source_file": "grading_2/IDRiD_017test.jpg",
+     "keywords": "moderate non proliferative retinopathy",
+     "artifact": ""
+    },
+    "od": {
+     "image": "v4-3-od.jpg",
+     "dataset": "IDRiD",
+     "labels": "D",
+     "grade": 2,
+     "grade_source": "idrid_folder",
+     "source_file": "grading_2/IDRiD_019test.jpg",
+     "keywords": "moderate non proliferative retinopathy",
+     "artifact": ""
+    }
+   }
+  },
+  "1": {
+   "k": 4,
+   "patient_id": "3030",
+   "age": "66",
+   "sex": "Male",
+   "patient_level_labels": "N",
+   "live": true,
+   "score": 20,
+   "stage2_hit": 0,
+   "stage2_total": 0,
+   "stage1_hit": 2,
+   "eyes": {
+    "os": {
+     "image": "v1-4-os.jpg",
+     "dataset": "ODIR-5K",
+     "labels": "N",
+     "grade": null,
+     "grade_source": "",
+     "source_file": "3030_left.jpg",
+     "keywords": "normal fundus",
+     "artifact": ""
+    },
+    "od": {
+     "image": "v1-4-od.jpg",
+     "dataset": "ODIR-5K",
+     "labels": "N",
+     "grade": null,
+     "grade_source": "",
+     "source_file": "3030_right.jpg",
+     "keywords": "normal fundus",
+     "artifact": ""
+    }
+   }
+  },
+  "9": {
+   "k": 0,
+   "patient_id": "4593",
+   "age": "65",
+   "sex": "Male",
+   "patient_level_labels": "D",
+   "live": false,
+   "score": 20,
+   "stage2_hit": 0,
+   "stage2_total": 2,
+   "stage1_hit": 2,
+   "eyes": {
+    "os": {
+     "image": "v9-0-os.jpg",
+     "dataset": "IDRiD",
+     "labels": "D",
+     "grade": 3,
+     "grade_source": "idrid_folder",
+     "source_file": "grading_3/IDRiD_006test.jpg",
+     "keywords": "severe nonproliferative retinopathy",
+     "artifact": ""
+    },
+    "od": {
+     "image": "v9-0-od.jpg",
+     "dataset": "IDRiD",
+     "labels": "D",
+     "grade": 2,
+     "grade_source": "idrid_folder",
+     "source_file": "grading_2/IDRiD_008test.jpg",
+     "keywords": "moderate non proliferative retinopathy",
+     "artifact": ""
+    }
+   }
+  },
+  "10": {
+   "k": 0,
+   "patient_id": "412",
+   "age": "60",
+   "sex": "Female",
+   "patient_level_labels": "D",
+   "live": false,
+   "score": 20,
+   "stage2_hit": 0,
+   "stage2_total": 2,
+   "stage1_hit": 2,
+   "eyes": {
+    "os": {
+     "image": "v10-0-os.jpg",
+     "dataset": "IDRiD",
+     "labels": "D",
+     "grade": 3,
+     "grade_source": "idrid_folder",
+     "source_file": "grading_3/IDRiD_006test.jpg",
+     "keywords": "severe nonproliferative retinopathy",
+     "artifact": ""
+    },
+    "od": {
+     "image": "v10-0-od.jpg",
+     "dataset": "IDRiD",
+     "labels": "D",
+     "grade": 4,
+     "grade_source": "idrid_folder",
+     "source_file": "grading_4/IDRiD_001test.jpg",
+     "keywords": "proliferative diabetic retinopathy",
+     "artifact": ""
+    }
+   }
+  },
+  "2": {
+   "k": 0,
+   "patient_id": "1417",
+   "age": "83",
+   "sex": "Male",
+   "patient_level_labels": "G",
+   "live": true,
+   "score": 10,
+   "stage2_hit": 0,
+   "stage2_total": 0,
+   "stage1_hit": 1,
+   "eyes": {
+    "os": {
+     "image": "v2-0-os.jpg",
+     "dataset": "ODIR-5K",
+     "labels": "N",
+     "grade": null,
+     "grade_source": "",
+     "source_file": "1417_left.jpg",
+     "keywords": "normal fundus",
+     "artifact": ""
+    },
+    "od": {
+     "image": "v2-0-od.jpg",
+     "dataset": "ODIR-5K",
+     "labels": "G",
+     "grade": null,
+     "grade_source": "",
+     "source_file": "1417_right.jpg",
+     "keywords": "suspected glaucoma",
+     "artifact": ""
+    }
+   }
+  },
+  "3": {
+   "k": 0,
+   "patient_id": "4330",
+   "age": "57",
+   "sex": "Female",
+   "patient_level_labels": "D|A",
+   "live": true,
+   "score": 10,
+   "stage2_hit": 0,
+   "stage2_total": 1,
+   "stage1_hit": 1,
+   "eyes": {
+    "os": {
+     "image": "v3-0-os.jpg",
+     "dataset": "ODIR-5K",
+     "labels": "N",
+     "grade": null,
+     "grade_source": "",
+     "source_file": "4330_left.jpg",
+     "keywords": "normal fundus",
+     "artifact": ""
+    },
+    "od": {
+     "image": "v3-0-od.jpg",
+     "dataset": "ODIR-5K",
+     "labels": "A|D",
+     "grade": 1,
+     "grade_source": "odir_keyword",
+     "source_file": "4330_right.jpg",
+     "keywords": "mild nonproliferative retinopathy; dry age-related macular degeneration",
+     "artifact": ""
+    }
+   }
+  },
+  "5": {
+   "k": 0,
+   "patient_id": "4215",
+   "age": "66",
+   "sex": "Male",
+   "patient_level_labels": "D|H",
+   "live": true,
+   "score": 10,
+   "stage2_hit": 0,
+   "stage2_total": 1,
+   "stage1_hit": 1,
+   "eyes": {
+    "os": {
+     "image": "v5-0-os.jpg",
+     "dataset": "IDRiD",
+     "labels": "D",
+     "grade": 1,
+     "grade_source": "idrid_folder",
+     "source_file": "grading_1/IDRiD_064test.jpg",
+     "keywords": "mild nonproliferative retinopathy",
+     "artifact": ""
+    },
+    "od": {
+     "image": "v5-0-od.jpg",
+     "dataset": "ODIR-5K",
+     "labels": "H",
+     "grade": null,
+     "grade_source": "",
+     "source_file": "4215_right.jpg",
+     "keywords": "hypertensive retinopathy",
+     "artifact": ""
+    }
+   }
+  },
+  "8": {
+   "k": 0,
+   "patient_id": "4452",
+   "age": "48",
+   "sex": "Female",
+   "patient_level_labels": "D",
+   "live": false,
+   "score": 10,
+   "stage2_hit": 0,
+   "stage2_total": 1,
+   "stage1_hit": 1,
+   "eyes": {
+    "os": {
+     "image": "v8-0-os.jpg",
+     "dataset": "IDRiD",
+     "labels": "D",
+     "grade": 1,
+     "grade_source": "idrid_folder",
+     "source_file": "grading_1/IDRiD_064test.jpg",
+     "keywords": "mild nonproliferative retinopathy",
+     "artifact": ""
+    },
+    "od": {
+     "image": "v8-0-od.jpg",
+     "dataset": "ODIR-5K",
+     "labels": "N",
+     "grade": null,
+     "grade_source": "",
+     "source_file": "4452_right.jpg",
+     "keywords": "normal fundus",
+     "artifact": ""
+    }
+   }
+  },
+  "6": {
+   "k": 0,
+   "patient_id": "931",
+   "age": "65",
+   "sex": "Male",
+   "patient_level_labels": "D|G",
+   "live": false,
+   "score": 0,
+   "stage2_hit": 0,
+   "stage2_total": 2,
+   "stage1_hit": 0,
+   "eyes": {
+    "os": {
+     "image": "v6-0-os.jpg",
+     "dataset": "ODIR-5K",
+     "labels": "D|G",
+     "grade": 2,
+     "grade_source": "odir_keyword",
+     "source_file": "931_left.jpg",
+     "keywords": "suspected glaucoma; moderate non proliferative retinopathy",
+     "artifact": ""
+    },
+    "od": {
+     "image": "v6-0-od.jpg",
+     "dataset": "ODIR-5K",
+     "labels": "D|G",
+     "grade": 2,
+     "grade_source": "odir_keyword",
+     "source_file": "931_right.jpg",
+     "keywords": "suspected glaucoma; moderate non proliferative retinopathy",
+     "artifact": ""
+    }
+   }
+  },
+  "7": {
+   "k": 0,
+   "patient_id": "323",
+   "age": "65",
+   "sex": "Male",
+   "patient_level_labels": "H|O",
+   "live": false,
+   "score": 0,
+   "stage2_hit": 0,
+   "stage2_total": 0,
+   "stage1_hit": 0,
+   "eyes": {
+    "os": {
+     "image": "v7-0-os.jpg",
+     "dataset": "ODIR-5K",
+     "labels": "H|O",
+     "grade": null,
+     "grade_source": "",
+     "source_file": "323_left.jpg",
+     "keywords": "hypertensive retinopathy; optic nerve atrophy",
+     "artifact": ""
+    },
+    "od": {
+     "image": "v7-0-od.jpg",
+     "dataset": "ODIR-5K",
+     "labels": "H",
+     "grade": null,
+     "grade_source": "",
+     "source_file": "323_right.jpg",
+     "keywords": "hypertensive retinopathy",
+     "artifact": ""
+    }
+   }
+  }
+ }
+}
