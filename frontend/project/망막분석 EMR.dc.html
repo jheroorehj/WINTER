@@ -9,6 +9,7 @@
      (jsDelivr 는 Access-Control-Allow-Origin: * ), 스레드는 끈다 — SharedArrayBuffer
      스레딩은 COOP/COEP 헤더를 요구하고 Vercel 정적 배포에는 그 헤더가 없다. -->
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/ort.wasm.min.js"></script>
+<script src="./preproc.js"></script>
 </head>
 <body>
 <x-dc>
@@ -485,9 +486,10 @@ function fitScale() {
 
 // 환자 자신의 안저 영상. 시나리오 데이터와 같은 출처를 쓴다.
 const IMG = '../../data/images/';
-// 유사 학습 사례 영상은 임베딩 이웃 검색 결과라 모델이 나와야 확정된다.
-// 그때까지 플레이스홀더를 쓴다.
-const NEIGHBOR_IMG = 'sample/';
+// 유사 학습 사례 영상. data/build_neighbors.py 가 kNN 결과에 등장한 55장만
+// 골라 복사해 둔 것이다 — 후보 828장 전부는 51MB 라 저장소에 넣지 않는다.
+const NEIGHBOR_IMG = '../../data/neighbors/';
+const NEIGHBORS_URL = '../../data/neighbors.json';
 
 // ── 모델 계약 ────────────────────────────────────────────────────────────
 // 출력은 이 순서의 길이 6 확률 벡터다. 학습 시 클래스 순서를 여기와 반드시 맞춘다.
@@ -683,214 +685,9 @@ const DR_GRADE_RULES = {
 const DR_CLOSE_AT = 0.15;
 
 // ── 전처리 ──────────────────────────────────────────────────────────────
-// 학습 때와 하나라도 다르면 추론이 조용히 틀린다(오류가 나지 않는다). 파이썬 참조
-// 구현은 data/reference_infer.py 에 있고, 두 구현이 같은 텐서를 만드는지 수치로
-// 비교하는 작업이 남아 있다 — README "알려진 문제" 참고.
-//
-// 체인: FOV crop → square pad → resize 224 → histogram match → CLAHE(green) →
-//       ImageNet 정규화 → NCHW
-// 이 "순서"는 preprocessing.json 에 명시돼 있지 않아 가정한 것이다.
-
-function loadImage(url) {
-  return new Promise((ok, no) => {
-    const im = new Image();
-    im.crossOrigin = 'anonymous';
-    im.onload = () => ok(im);
-    im.onerror = () => no(new Error('영상을 읽을 수 없습니다: ' + url));
-    im.src = url;
-  });
-}
-
-function canvasOf(w, h) {
-  const c = document.createElement('canvas');
-  c.width = w; c.height = h;
-  return c;
-}
-
-// 안저 원판의 바운딩 박스. 검은 배경을 남기면 정규화 통계가 오염된다.
-function fovBox(data, w, h, thr) {
-  let x0 = w, y0 = h, x1 = -1, y1 = -1;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4;
-      // cv2.COLOR_BGR2GRAY 와 같은 계수
-      const g = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-      if (g > thr) {
-        if (x < x0) x0 = x;
-        if (x > x1) x1 = x;
-        if (y < y0) y0 = y;
-        if (y > y1) y1 = y;
-      }
-    }
-  }
-  return x1 < 0 ? { x: 0, y: 0, w: w, h: h } : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
-}
-
-// 채널별 CDF 매칭. 기준 CDF 는 학습셋 512장에서 만든 값이다. 안저 영상은 카메라·
-// 조명에 따라 색조가 크게 흔들리므로 학습셋 색분포로 끌어당겨야 추론 분포가 맞는다.
-// 마스크 밖(검은 배경)은 통계에서 뺀다 — 넣으면 0 이 대량 유입돼 매핑이 무너진다.
-function matchHistogram(px, n, ref, blend, thr) {
-  const refCdf = ref.cdf, refVal = ref.values;
-  const mask = new Uint8Array(n * n);
-  for (let i = 0, j = 0; i < n * n; i++, j += 4) {
-    const g = 0.299 * px[j] + 0.587 * px[j + 1] + 0.114 * px[j + 2];
-    mask[i] = g > thr ? 1 : 0;
-  }
-  for (let ch = 0; ch < 3; ch++) {          // 0=R 1=G 2=B, 기준 CDF 도 RGB 순서
-    const hist = new Float64Array(256);
-    let cnt = 0;
-    for (let i = 0, j = ch; i < n * n; i++, j += 4) {
-      if (mask[i]) { hist[px[j]]++; cnt++; }
-    }
-    if (!cnt) continue;
-    // 소스 CDF → 기준 CDF 역보간으로 LUT 를 만든다
-    const lut = new Float32Array(256);
-    let acc = 0, k = 0;
-    const rc = refCdf[ch], rv = refVal[ch];
-    for (let v = 0; v < 256; v++) {
-      acc += hist[v] / cnt;
-      while (k < 255 && rc[k] < acc) k++;
-      // np.interp 와 같은 선형 보간
-      if (k === 0) lut[v] = rv[0];
-      else {
-        const c0 = rc[k - 1], c1 = rc[k];
-        const t = c1 > c0 ? (acc - c0) / (c1 - c0) : 0;
-        lut[v] = rv[k - 1] + t * (rv[k] - rv[k - 1]);
-      }
-    }
-    // 매핑은 마스크 안쪽에만 쓴다. 통계는 전경에서 내면서 매핑을 배경까지 덮으면
-    // 검은 배경이 밝은 값으로 칠해진다 — 정사각 패딩 후 배경이 화면의 약 21% 라
-    // 무시할 수 있는 영역이 아니다. 학습 저장소에서 실측한 이탈량 2.50 gray level.
-    for (let i = 0, j = ch; i < n * n; i++, j += 4) {
-      if (!mask[i]) continue;
-      const v = px[j];
-      px[j] = Math.max(0, Math.min(255, Math.round((1 - blend) * v + blend * lut[v])));
-    }
-  }
-}
-
-// CLAHE. cv2.createCLAHE 와 같은 방식이다 — 타일별 히스토그램을 clipLimit 로 자르고
-// 초과분을 균등 재분배한 뒤 CDF LUT 을 만들고, 타일 경계는 이중선형 보간한다.
-// cv2 의 clipLimit 은 정규화된 값이라 실제 자르는 높이는 clip * 타일면적 / 256 이다.
-function clahe(plane, w, h, clipLimit, gx, gy) {
-  const tw = Math.ceil(w / gx), th = Math.ceil(h / gy);
-  const area = tw * th;
-  let clip = Math.max(1, Math.round(clipLimit * area / 256));
-  const luts = new Uint8Array(gx * gy * 256);
-
-  for (let ty = 0; ty < gy; ty++) {
-    for (let tx = 0; tx < gx; tx++) {
-      const hist = new Int32Array(256);
-      const xs = tx * tw, ys = ty * th;
-      const xe = Math.min(xs + tw, w), ye = Math.min(ys + th, h);
-      for (let y = ys; y < ye; y++) {
-        for (let x = xs; x < xe; x++) hist[plane[y * w + x]]++;
-      }
-      let excess = 0;
-      for (let v = 0; v < 256; v++) if (hist[v] > clip) { excess += hist[v] - clip; hist[v] = clip; }
-      const inc = Math.floor(excess / 256);
-      let rest = excess - inc * 256;
-      for (let v = 0; v < 256; v++) hist[v] += inc;
-      // 남은 픽셀은 cv2 와 같이 일정 간격으로 흩뿌린다
-      if (rest > 0) {
-        const step = Math.max(1, Math.floor(256 / rest));
-        for (let v = 0; v < 256 && rest > 0; v += step) { hist[v]++; rest--; }
-        for (let v = 0; v < 256 && rest > 0; v++) { hist[v]++; rest--; }
-      }
-      const n = (xe - xs) * (ye - ys);
-      const scale = 255 / n;
-      let sum = 0, base = (ty * gx + tx) * 256;
-      for (let v = 0; v < 256; v++) {
-        sum += hist[v];
-        luts[base + v] = Math.max(0, Math.min(255, Math.round(sum * scale)));
-      }
-    }
-  }
-
-  const out = new Uint8Array(w * h);
-  for (let y = 0; y < h; y++) {
-    // 타일 중심 기준 좌표
-    let fy = y / th - 0.5, ty0 = Math.floor(fy);
-    let wy = fy - ty0;
-    if (ty0 < 0) { ty0 = 0; wy = 0; }
-    let ty1 = Math.min(ty0 + 1, gy - 1);
-    if (ty0 > gy - 1) { ty0 = ty1 = gy - 1; wy = 0; }
-    for (let x = 0; x < w; x++) {
-      let fx = x / tw - 0.5, tx0 = Math.floor(fx);
-      let wx = fx - tx0;
-      if (tx0 < 0) { tx0 = 0; wx = 0; }
-      let tx1 = Math.min(tx0 + 1, gx - 1);
-      if (tx0 > gx - 1) { tx0 = tx1 = gx - 1; wx = 0; }
-      const v = plane[y * w + x];
-      const a = luts[(ty0 * gx + tx0) * 256 + v], b = luts[(ty0 * gx + tx1) * 256 + v];
-      const c = luts[(ty1 * gx + tx0) * 256 + v], d = luts[(ty1 * gx + tx1) * 256 + v];
-      out[y * w + x] = Math.round((a * (1 - wx) + b * wx) * (1 - wy) + (c * (1 - wx) + d * wx) * wy);
-    }
-  }
-  return out;
-}
-
-// 영상 → NCHW Float32Array. meta 는 preprocessing.json + color_reference.json.
-function preprocess(img, meta) {
-  const pre = meta.pre, ref = meta.ref;
-  const thr = (ref && ref.mask_threshold !== undefined) ? ref.mask_threshold : 12;
-  const n = pre.img_size;
-
-  // 1) 원본을 캔버스로
-  let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
-  let cv = canvasOf(w, h), cx = cv.getContext('2d', { willReadFrequently: true });
-  cx.drawImage(img, 0, 0);
-  let box = { x: 0, y: 0, w: w, h: h };
-
-  // 2) FOV crop
-  if (pre.fov_crop) box = fovBox(cx.getImageData(0, 0, w, h).data, w, h, thr);
-
-  // 3) square pad + 4) resize 를 한 번의 drawImage 로 합친다. 정사각 캔버스의
-  //    가운데에 크롭 영역을 비율 유지해 그리면 패딩과 리사이즈가 동시에 끝난다.
-  const side = Math.max(box.w, box.h);
-  const dst = canvasOf(n, n), dc = dst.getContext('2d', { willReadFrequently: true });
-  // 학습은 PIL bilinear 로 축소하며 antialias 가 켜져 있다. drawImage 의 기본
-  // 품질은 구현에 맡겨져 있어 antialias 없이 줄어들 수 있다(실측 3.17 gray level).
-  dc.imageSmoothingEnabled = true;
-  dc.imageSmoothingQuality = 'high';
-  dc.fillStyle = '#000';
-  dc.fillRect(0, 0, n, n);
-  const k = n / side;
-  dc.drawImage(img, box.x, box.y, box.w, box.h,
-               (n - box.w * k) / 2, (n - box.h * k) / 2, box.w * k, box.h * k);
-
-  const id = dc.getImageData(0, 0, n, n);
-  const px = id.data;
-
-  // 5) histogram match
-  if (pre.histogram_match && ref && ref.cdf) {
-    matchHistogram(px, n, ref, pre.color_match_blend === undefined ? 1 : pre.color_match_blend, thr);
-  }
-
-  // 6) CLAHE — green 채널만이 기본이다. 안저에서 병변 대비가 가장 큰 채널이다.
-  if (pre.clahe) {
-    const grid = pre.clahe_grid || [8, 8];
-    const chans = pre.clahe_green_only ? [1] : [0, 1, 2];
-    for (let ci = 0; ci < chans.length; ci++) {
-      const ch = chans[ci];
-      const plane = new Uint8Array(n * n);
-      for (let i = 0, j = ch; i < n * n; i++, j += 4) plane[i] = px[j];
-      const eq = clahe(plane, n, n, pre.clahe_clip_limit, grid[0], grid[1]);
-      for (let i = 0, j = ch; i < n * n; i++, j += 4) px[j] = eq[i];
-    }
-  }
-
-  // 7) ImageNet 정규화 → NCHW
-  const mean = pre.imagenet_mean || [0, 0, 0], std = pre.imagenet_std || [1, 1, 1];
-  const out = new Float32Array(3 * n * n);
-  const plane = n * n;
-  for (let i = 0, j = 0; i < plane; i++, j += 4) {
-    out[i] = (px[j] / 255 - mean[0]) / std[0];
-    out[plane + i] = (px[j + 1] / 255 - mean[1]) / std[1];
-    out[2 * plane + i] = (px[j + 2] / 255 - mean[2]) / std[2];
-  }
-  return out;
-}
+// preproc.js 로 분리했다. 임베딩 뱅크 빌더(data/build_neighbors.py)가 같은 파일을
+// 로드하므로, 뱅크와 화면의 쿼리가 같은 전처리를 지나는 것이 보장된다.
+// 복사본을 두면 한쪽이 낡아 kNN 이 다른 공간을 비교하게 된다.
 
 // ── 모델 연결 지점 ──────────────────────────────────────────────────────
 // 화면 로직은 infer() 가 돌려주는 길이 6 확률 벡터만 알면 되고, 그 아래는 모른다.
@@ -914,11 +711,17 @@ const MODEL = {
       if (!r.ok) throw new Error(s + '.json 을 읽을 수 없습니다 (' + r.status + ')');
       return r.json();
     });
+    // 이웃 결과는 빌드 타임 산출물이라 모델과 무관하게 실패할 수 있다. 못 받아도
+    // 추론은 계속돼야 하므로 여기서만 삼킨다 — 이웃 칸만 비고 소견은 정상 표시된다.
+    // Promise.all 안에 넣는 이유는 렌더 시점 경쟁을 없애기 위해서다. 밖에서 따로
+    // 받으면 첫 렌더가 NEIGHBORS=null 로 지나가고, 도착해도 다시 그리지 않는다.
+    const nb = fetch(NEIGHBORS_URL).then(r => r.ok ? r.json() : null).catch(() => null);
     return Promise.all([
       j('preprocessing'), j('postprocessing'), j('color_reference'),
-      ort.InferenceSession.create(MODEL_URL, { executionProviders: ['wasm'] })
+      ort.InferenceSession.create(MODEL_URL, { executionProviders: ['wasm'] }), nb
     ]).then(r => {
       const pre = r[0], post = r[1], ref = r[2], net = r[3];
+      NEIGHBORS = r[4];
       // 라벨 순서가 화면 계약과 다르면 즉시 멈춘다. 어긋난 채로 돌면 소견 이름이
       // 뒤바뀐 화면이 나오고, 그건 오류보다 위험하다.
       if (post.labels.join(',') !== LABEL_ORDER.join(',')) {
@@ -1082,26 +885,36 @@ function inferScenario(sc) {
 
 // neighbors(sc, eye) → 유사 학습 사례. 임베딩 사전계산이 끝나면 kNN 결과로 교체한다.
 // 지금은 검출 라벨에 맞춘 플레이스홀더이며, 영상도 실제 이웃이 아니다.
-const NEIGHBOR_DX = {
-  D: ['중등도 비증식 당뇨망막병증', '중증 비증식 당뇨망막병증', '당뇨망막병증 + 망막출혈'],
-  G: ['녹내장성 시신경 위축', '녹내장 의심 · 시신경테 얇아짐', '큰 생리적 시신경 함몰'],
-  A: ['건성 연령관련 황반변성', '습성 연령관련 황반변성', '중간 단계 드루젠'],
-  H: ['고혈압성 망막병증 grade 2', '고혈압성 망막병증 + 혈관 협착', '망막 혈관 협착'],
-  O: ['망막전막 (ERM)', '유리체 변성', '매체 혼탁'],
-  N: ['정상 안저', '정상 안저 (렌즈 먼지)', '정상 시신경']
-};
+// data/neighbors.json 을 로드해 채운다. 빌드 타임에 계산된 실제 kNN 결과다 —
+// data/build_neighbors.py 가 홀드아웃 828눈의 임베딩(분류기 직전 768차원)을 뽑고
+// 코사인 유사도로 눈당 3개를 고른다. 자기 자신과 같은 환자의 반대쪽 눈은 후보에서 뺀다.
+let NEIGHBORS = null;
+
+// 이웃의 눈별 라벨을 사람이 읽는 소견명으로. 라벨셋 밖 조합도 그대로 보여준다 —
+// 임의로 하나를 골라 버리면 동반 소견이 사라진다.
+// 두 라벨 집합이 같은가. 순서·중복과 무관하게 비교한다.
+function sameLabelSet(a, b) {
+  const A = (a || 'N').split('|').filter(x => x && x !== 'N').sort();
+  const B = (Array.isArray(b) ? b.slice() : (b || '').split('|')).filter(x => x && x !== 'N').sort();
+  return A.length === B.length && A.every((x, i) => x === B[i]);
+}
+
+function neighborDx(labels) {
+  return (labels || 'N').split('|').map(c => LABELS[c] || c).join(' + ');
+}
 
 function neighbors(sc, eye, preds) {
-  const top = (preds && preds.length) ? preds[0][0] : 'N';
-  const dxs = NEIGHBOR_DX[top] || NEIGHBOR_DX.O;
-  const side = eye === 'os' ? 'os' : 'od';
-  return dxs.map((dx, i) => ({
-    id: 'HOLDOUT_' + String(1000 + Math.round(mockJitter(sc.scenario_no + eye + i) * 8999)),
-    code: i === 2 && top !== 'N' ? 'N' : top,   // 3순위는 일부러 라벨을 어긋나게 둔다
-    dx: dx,
-    grade: '확정 진단',
-    sim: (94 - i * 3 - Math.round(mockJitter(sc.scenario_no + eye + 'sim' + i) * 20) / 10).toFixed(1) + '%',
-    img: NEIGHBOR_IMG + 'similar-' + side + '-' + (i + 1) + '.jpg'
+  const key = 's' + sc.scenario_no + '-' + eye;
+  const list = NEIGHBORS && NEIGHBORS.neighbors && NEIGHBORS.neighbors[key];
+  if (!list) return [];              // 아직 로드 전이거나 이 눈의 결과가 없다
+  return list.map(n => ({
+    id: n.id,
+    code: (n.labels || 'N').split('|')[0],   // 일치도 비교용 대표 코드
+    labels: n.labels,
+    dx: neighborDx(n.labels),
+    grade: n.age + '세 · ' + (n.sex === 'Male' ? '남' : '여'),
+    sim: (n.sim * 100).toFixed(1) + '%',
+    img: NEIGHBOR_IMG + n.file
   }));
 }
 
@@ -1427,9 +1240,16 @@ class Component extends DCLogic {
   // 1순위를 꺼내는 코드는 전부 빈 배열을 견뎌야 한다 — 여기서 터지면 첫 렌더가 죽는다.
   agree(p, eye) {
     const list = eye === 'os' ? p.simOS : p.simOD;
-    if (!p[eye].preds.length) return '—';
-    const top = p[eye].preds[0][0];
-    return list.filter(c => c.code === top).length + '/' + list.length;
+    if (!p[eye].preds.length || !list.length) return '—';
+    // 1순위 코드 하나가 아니라 검출된 라벨 "집합"으로 비교한다. 이웃도 동반 소견을
+    // 가질 수 있어(D|H 등) 대표 코드만 보면 D|H 를 D 와 같다고 세게 된다.
+    const det = this.detected(p, eye);
+    return list.filter(c => sameLabelSet(c.labels, det)).length + '/' + list.length;
+  }
+
+  // 그 눈에서 임계값을 넘은 라벨 집합. 이웃 일치도와 유사사례 카드가 같은 기준을 쓴다.
+  detected(p, eye) {
+    return p[eye].preds.filter(d => d[0] !== 'N' && d[1] > thrOf(d[0])).map(d => d[0]);
   }
 
   // 사진 위 오버레이(.onimg)는 accent 단색 — 위험도를 색으로 말하는 건 사이드바 몫이다.
@@ -1439,9 +1259,12 @@ class Component extends DCLogic {
   pred(list) {
     // 오버레이는 상위 3개만 보여준다. 임상 권고·의심 소견 목록은 잘리지 않은
     // 전체 예측을 쓴다(buildPatient / suspects).
+    // 임계값을 넘지 못한 항목은 그렇다고 적는다. 클래스별 임계값이 제각각(G 92% ·
+    // D 52%)이라 원값만 크게 띄우면 "녹내장 90%" 가 사진 위에 뜨는데 의심 목록에는
+    // 없는 상태가 된다 — 화면이 스스로 모순돼 보이고, 확진처럼 읽힐 위험이 있다.
     return (list || []).slice(0, 3).map(([code, v]) => ({
       code: code,
-      label: LABELS[code] || code,
+      label: (LABELS[code] || code) + (v > thrOf(code) ? '' : ' · 임계 미만'),
       dim: (0.42 + 0.58 * v).toFixed(2),
       pctText: Math.round(v * 100) + '%'
     }));
@@ -1504,11 +1327,12 @@ class Component extends DCLogic {
     // 추론 전에는 1순위가 없다. 그때는 일치 여부를 판정하지 않고 비워 둔다 —
     // 값이 없는 것과 불일치는 다른 상태다.
     const top1 = (eye) => p[eye].preds.length ? p[eye].preds[0] : null;
+    const hit = (eye, c) => sameLabelSet(c.labels, this.detected(p, eye));
     const card = (eye) => (c, i) => Object.assign({}, c, {
       rank: i + 1,
       eyeCode: EYE[eye].code,
-      match: !top1(eye) ? '추정 전' : (c.code === top1(eye)[0] ? '라벨 일치' : '라벨 불일치'),
-      matchDim: !top1(eye) ? 0.55 : (c.code === top1(eye)[0] ? 1 : 0.55),
+      match: !top1(eye) ? '추정 전' : (hit(eye, c) ? '라벨 일치' : '라벨 불일치'),
+      matchDim: !top1(eye) ? 0.55 : (hit(eye, c) ? 1 : 0.55),
       onClick: () => this.setState({
         compare: Object.assign({}, c, {
           rank: i + 1,

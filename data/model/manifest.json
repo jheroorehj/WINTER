@@ -10,6 +10,11 @@
     "sha256": "c59259ed49add07b7fd97865f9be255e353196269bf3cee2750eb4c9ad55a2d0"
   },
   {
+    "file": "stage1_odir_convnextv2_tiny_int8_embed.onnx",
+    "size_mb": 28.456,
+    "sha256": "6b64c767078a7210b429a9413ef394f7504959e072a0ef8c92e8df5da6837e59"
+  },
+  {
     "file": "stage1_odir_convnextv2_tiny_labels.txt",
     "size_mb": 0.0,
     "sha256": "72b5b2ea5f5fd2e623be9d3a73d0bfa52434e94cd2fd5f359543808867fb3d2e"

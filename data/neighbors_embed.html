@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<!--
+  임베딩 뱅크 빌더의 브라우저 쪽. data/build_neighbors.py 가 헤드리스 Chrome 으로
+  이 페이지를 열고, 결과를 DOM 에서 읽어 간다. 직접 열 일은 없다.
+
+  왜 파이썬이 아니라 브라우저인가. 이웃 검색은 코사인 kNN 이므로 뱅크 임베딩과 화면의
+  쿼리 임베딩이 같은 전처리에서 나와야 한다. 파이썬으로 전처리를 다시 구현하면 화면과
+  갈라지고, 그렇게 갈라진 두 공간을 비교하는 kNN 은 의미가 없다. 그래서 화면이 쓰는
+  frontend/project/preproc.js 를 그대로 로드해 같은 코드로 돌린다.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/ort.wasm.min.js"></script>
+<script src="../frontend/project/preproc.js"></script>
+</head>
+<body>
+<pre id="out"></pre>
+<script>
+// 출력은 L2 정규화 후 int8 양자화 → base64. 코사인 유사도만 쓰므로 int8 로 충분하고
+// (상대오차 약 0.4%), 848×768 이 651KB → base64 868KB 로 DOM 에 담긴다.
+(async () => {
+  const el = document.getElementById('out');
+  const put = (s) => { el.textContent += s + '\n'; };
+  try {
+    ort.env.wasm.numThreads = 1;      // COOP/COEP 없이 스레딩을 켜면 로드가 죽는다
+    ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/';
+
+    const MODEL = '../data/model/stage1_odir_convnextv2_tiny_int8_embed.onnx';
+    const j = (s) => fetch('../data/model/stage1_odir_convnextv2_tiny_' + s + '.json').then(r => r.json());
+    const [pre, ref, list, net] = await Promise.all([
+      j('preprocessing'), j('color_reference'),
+      fetch('./_neighbors_list.json').then(r => r.json()),
+      ort.InferenceSession.create(MODEL, { executionProviders: ['wasm'] })
+    ]);
+    // 두 번째 출력이 임베딩이다(그래프에 출력만 추가했으므로 logits 는 그대로).
+    const IN = net.inputNames[0], EMB = net.outputNames[1];
+    if (!EMB) throw new Error('임베딩 출력이 없습니다. _embed.onnx 를 쓰고 있는지 확인하세요.');
+
+    const meta = { pre: pre, ref: ref };
+    const q = new Int8Array(list.length * 768);
+    const ids = [];
+    for (let k = 0; k < list.length; k++) {
+      const img = await loadImage(list[k].url);
+      const x = preprocess(img, meta);                 // preproc.js — 화면과 같은 코드
+      const feed = {};
+      feed[IN] = new ort.Tensor('float32', x, [1, 3, pre.img_size, pre.img_size]);
+      const v = (await net.run(feed))[EMB].data;
+      let n = 0;
+      for (let i = 0; i < 768; i++) n += v[i] * v[i];
+      n = Math.sqrt(n) || 1;
+      for (let i = 0; i < 768; i++) {
+        q[k * 768 + i] = Math.max(-127, Math.min(127, Math.round(v[i] / n * 127)));
+      }
+      ids.push(list[k].id);
+    }
+    let s = '';
+    const u8 = new Uint8Array(q.buffer);
+    for (let i = 0; i < u8.length; i += 8192) {
+      s += String.fromCharCode.apply(null, u8.subarray(i, i + 8192));
+    }
+    put('COUNT ' + list.length);
+    put('DIM 768');
+    put('IDS ' + ids.join(','));
+    put('B64 ' + btoa(s));
+    put('DONE');
+  } catch (e) {
+    put('ERROR ' + (e && e.message || e));
+  }
+})();
+</script>
+</body>
+</html>
