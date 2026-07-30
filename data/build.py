@@ -8,7 +8,7 @@
 그래서 시나리오도 눈별로 "1단계 라벨"과 "2단계 등급"을 함께 들고 있어야 한다.
 등급 정답은 두 곳에서 나온다.
   ODIR 키워드   'mild/moderate/severe nonproliferative', 'proliferative' → 1/2/3/4
-  IDRiD 폴더    Diabetic retinopathy/grading_N/ 의 N
+  IDRiD 폴더    test/grading_N/ 의 N (IDRiD 테스트 분할, 240x240 미전처리)
 
 D 단독 눈은 영상을 IDRiD 쪽으로 교체한다(DR_IMAGE_SWAP 참고). 2단계 모델이
 IDRiD 로 학습되므로 시연 영상도 같은 분포에 두고, 등급 정답을 폴더로 검증할 수 있다.
@@ -17,7 +17,11 @@ IDRiD 로 학습되므로 시연 영상도 같은 분포에 두고, 등급 정�
 
 원본 데이터셋(test_dataset_seed42/, archive/)은 .gitignore 로 제외돼 있어
 클린 클론에서는 실행되지 않는다. 데이터셋을 가진 로컬에서만 돌린다.
-(Diabetic retinopathy/ 는 224x224 로 이미 줄여진 65장이라 저장소에 들어 있다.)
+(test/ 은 240x240 미전처리 80장이라 저장소에 들어 있다. "미전처리"가 중요하다 —
+1단계는 자체 전처리(FOV crop·histogram match·CLAHE)를 하고 2단계는 TM 라이브러리가
+자체 전처리를 하므로, 이미 전처리된 영상을 넣으면 이중 처리가 된다. 실제로
+val_stage2_ready/(224, 2단계용 전처리본)를 쓰면 2단계는 좋아지고 1단계가 나빠졌다.
+val/, val_stage2_ready/, Diabetic retinopathy/ 도 저장소에 있지만 쓰지 않는다.)
 
     python3 data/build.py            # 저장소 루트에서
 
@@ -29,9 +33,12 @@ import csv, json, os, shutil, sys, collections
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC_LABELS = os.path.join(ROOT, 'test_dataset_seed42', 'test_labels.csv')
 SRC_IMAGES = os.path.join(ROOT, 'archive', 'preprocessed_images')   # 512x512 전처리본
-DR_DIR = os.path.join(ROOT, 'Diabetic retinopathy')                 # 224x224 IDRiD 등급 영상
+DR_DIR = os.path.join(ROOT, 'test')                                 # 240x240 IDRiD 테스트 분할 (미전처리)
 OUT_DIR = os.path.join(ROOT, 'data')
 OUT_IMAGES = os.path.join(OUT_DIR, 'images')
+# build_variants.py 가 쓴 선택 결과. 있으면 시나리오의 환자·영상을 이걸로 덮어쓴다.
+# 없으면 SCENARIOS 의 pid 를 그대로 쓴다 — 변형을 만들지 않은 상태에서도 빌드된다.
+VARIANT_PICK = os.path.join(OUT_DIR, 'variant_pick.json')
 
 # ── 키워드 → 클래스 매핑 ────────────────────────────────────────────────
 # 임의로 정하지 않았다. 원본은 환자 단위 8클래스 라벨만 주고 눈별 정보는 자유 텍스트
@@ -62,9 +69,12 @@ SIX = ['N', 'D', 'G', 'A', 'H', 'O']          # 1단계 모델이 추론하는 �
 OUT_OF_SET = {'C', 'M'}                        # 6클래스 밖 — 시연에서 제외
 
 # ── 2단계: 당뇨망막병증 중증도 ───────────────────────────────────────────
-# 국제 임상 분류(ICDR)와 같은 4단계이며 Diabetic retinopathy/grading_N/ 의 N 과 1:1.
-# grading_0(당뇨망막병증 없음)은 데이터셋에 없다 — 2단계 모델은 "정상"을 말할 수 없고
-# 1단계가 D 를 의심한 눈에만 조건부로 돌아간다. 화면도 그렇게 표시해야 한다.
+# 국제 임상 분류(ICDR)와 같은 4단계이며 test/grading_N/ 의 N 과 1:1.
+#
+# test/ 에는 grading_0(DR 없음) 15장도 있지만 여기서는 쓰지 않는다. 시나리오의 D 눈은
+# 정의상 당뇨망막병증이 있는 눈이므로 0등급을 배정할 일이 없다. grading_0 은 2단계
+# 모델이 "DR 아님"을 말할 수 있다는 뜻이고, 그건 화면 쪽 계약이다(1단계와 불일치할 때
+# 병기를 붙이지 않는다). verify_models.py 는 grading_0 도 검증에 쓴다.
 DR_GRADES = {
     1: 'Mild NPDR · 경증 비증식',
     2: 'Moderate NPDR · 중등도 비증식',
@@ -319,7 +329,7 @@ SNAKE = {'osImage': 'os_image', 'odImage': 'od_image', 'osLabels': 'os_labels',
          'patientLine': 'patient_line'}
 
 
-def inject_prototype(records):
+def inject_prototype(records, total=None):
     if not os.path.exists(PROTOTYPE):
         print('  (프로토타입 없음 — 주입 생략)')
         return
@@ -333,9 +343,16 @@ def inject_prototype(records):
             pairs.append('%s: %s' % (k, json.dumps(v, ensure_ascii=False)))
         items.append('  { ' + ', '.join(pairs) + ' }')
     block = (BEGIN + ' — 수정하지 마세요. `python3 data/build.py` 가 이 블록을 덮어씁니다. ====\n'
-             '// 출처: data/scenarios.csv (%d건). 실제 데이터는 age/sex/영상/라벨뿐이며\n'
-             '// 임상정보와 환자명은 생성값이다 — clinical_fields_synthetic 열 참고.\n'
-             'const SCENARIOS = [\n%s\n];\n' % (len(records), ',\n'.join(items)))
+             '// 출처: data/scenarios_demo.csv — 심사 발표용 %d건%s.\n'
+             '// 어느 케이스를 보여줄지는 build_variants.py 의 측정 결과가 정한다\n'
+             '// (data/variant_pick.json). 고른 케이스는 전체를 대표하지 않으므로\n'
+             '// 발표에서 홀드아웃 전체 수치를 함께 제시할 것.\n'
+             '// 실제 데이터는 age/sex/영상/라벨뿐이며 임상정보와 환자명은 생성값이다\n'
+             '// — clinical_fields_synthetic 열 참고.\n'
+             'const SCENARIOS = [\n%s\n];\n'
+             % (len(records),
+                (' (전체 %d건 중)' % total) if total else '',
+                ',\n'.join(items)))
     open(PROTOTYPE, 'w', encoding='utf-8').write(src[:i] + block + src[j:])
     print('  프로토타입 GENERATED 블록 주입: %d건' % len(records))
 
@@ -352,11 +369,18 @@ def main():
         sys.exit('IDRiD 등급 영상이 없습니다: %s/grading_N/' % DR_DIR)
     taken = set()                       # 같은 IDRiD 장을 두 번 쓰지 않도록
 
+    pick = {}
+    if os.path.exists(VARIANT_PICK):
+        pick = json.load(open(VARIANT_PICK, encoding='utf-8')).get('pick', {})
+        print('variant_pick.json 적용 — 시나리오 %d건이 측정으로 고른 변형을 쓴다' % len(pick))
+
     records, problems = [], []
     for s in SCENARIOS:
-        src = by_id.get(s['pid'])
+        chosen = pick.get(str(s['no']))
+        src = by_id.get(chosen['patient_id'] if chosen else s['pid'])
         if not src:
-            problems.append('시나리오 %d: 환자 ID %s 없음' % (s['no'], s['pid']))
+            problems.append('시나리오 %d: 환자 ID %s 없음'
+                            % (s['no'], (chosen or s)['patient_id' if chosen else 'pid']))
             continue
 
         # 1단계 라벨을 양안 먼저 확정한다. 영상 교체 여부가 반대쪽 눈에도 달려 있다.
@@ -391,8 +415,14 @@ def main():
                 problems.append('시나리오 %d %s: 등급 %d 인데 dr= 선언이 없다'
                                 % (s['no'], tag.upper(), grade))
 
+            # 선택된 변형이 있으면 그 영상을 쓴다. build_variants.py 가 이미 규칙에 따라
+            # 고르고 측정까지 한 결과이므로 여기서 다시 배정하지 않는다.
+            ce = (chosen or {}).get('eyes', {}).get(tag)
+            if ce:
+                srcp = os.path.join(OUT_DIR, 'variants', ce['image'])
+                dataset, source, gsrc = ce['dataset'], ce['source_file'], ce['grade_source']
             # 영상 선택. D 단독 눈은 IDRiD, 그 외는 ODIR 전처리본.
-            if wants_idrid(dz, truth['os']['dz'], truth['od']['dz']) and grade:
+            elif wants_idrid(dz, truth['os']['dz'], truth['od']['dz']) and grade:
                 f = pick_idrid(pool, grade, s['no'], si, taken)
                 if not f:
                     problems.append('시나리오 %d %s: grading_%d 에 배정할 영상이 없다'
@@ -427,7 +457,9 @@ def main():
 
         records.append(dict(
             scenario_no=s['no'], scenario_key=s['key'], scenario_name=s['name'],
-            demo_primary=s['primary'], proves=s['proves'],
+            # 라이브 여부는 측정 결과로 정한다. 선택 파일이 없으면 선언값을 쓴다.
+            demo_primary=(1 if chosen['live'] else 0) if chosen else s['primary'],
+            proves=s['proves'],
             patient_id=src['ID'], age=src['Patient Age'], sex=src['Patient Sex'],
             patient_level_labels='|'.join(k for k in ['N','D','G','C','A','H','M','O']
                                          if int(src[k])),
@@ -475,9 +507,33 @@ def main():
             'scenarios': records,
         }, f, ensure_ascii=False, indent=2)
 
-    inject_prototype(records)
+    # ── 발표용 서브셋 ──────────────────────────────────────────────────
+    # 심사에서 보여줄 것만 담는다. 전체 10건은 scenarios.csv 에 그대로 남는다 —
+    # 정확도 평가와 재측정에 필요하고, 보여줄 것을 골랐다는 사실 자체를 지우지 않는다.
+    # 어느 5건인지는 build_variants.py 의 측정 결과(variant_pick.json)가 정한다.
+    demo = [r for r in records if r['demo_primary']]
+    with open(os.path.join(OUT_DIR, 'scenarios_demo.csv'), 'w', encoding='utf-8', newline='') as f:
+        w = csv.DictWriter(f, fieldnames=cols)
+        w.writeheader()
+        w.writerows(demo)
+    with open(os.path.join(OUT_DIR, 'scenarios_demo.json'), 'w', encoding='utf-8') as f:
+        json.dump({
+            'stage1': {'labelSet': SIX, 'multilabel': True},
+            'stage2': {'gate': 'D', 'gradeSet': sorted(DR_GRADES), 'multilabel': False,
+                       'grades': {str(k): v for k, v in sorted(DR_GRADES.items())}},
+            'note': ('심사 발표용 서브셋 %d건. 전체 %d건은 scenarios.csv 에 있다. '
+                     '고른 케이스는 전체를 대표하지 않으므로 홀드아웃 전체 수치'
+                     '(verify_models.py SUMMARY)를 함께 제시할 것.'
+                     % (len(demo), len(records))),
+            'scenarios': demo,
+        }, f, ensure_ascii=False, indent=2)
+
+    # 배포되는 화면은 발표용 서브셋을 쓴다. Vercel 이 이 프로토타입을 서브한다.
+    inject_prototype(demo, len(records))
 
     print('scenarios.csv / scenarios.json — %d건 %d열' % (len(records), len(cols)))
+    print('scenarios_demo.csv / .json — 발표용 %d건 (s%s)'
+          % (len(demo), ', s'.join(str(r['scenario_no']) for r in demo)))
     cov = collections.Counter()
     gcov = collections.Counter()
     gsrc = collections.Counter()

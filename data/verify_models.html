@@ -73,7 +73,7 @@
       }
 
       // 2단계 — 게이트를 넘은 눈만. 전처리는 TM 라이브러리가 한다.
-      let s2 = '-', verdict = '', topGrade = null;
+      let s2 = '-', verdict = '', topGrade = null, topP = 0;
       if (p1.D > GATE) {
         gate++;
         const pr = (await net2.predict(img, false)).slice()
@@ -81,6 +81,7 @@
         s2 = pr[0].className + ' ' + pr[0].probability.toFixed(3);
         const g = String(pr[0].className).match(/(\d+)/);
         topGrade = g ? parseInt(g[1], 10) : null;
+        topP = pr[0].probability;
         if (topGrade === 0) { disagree++; verdict = '불일치(2단계 DR없음)'; }
         else { verdict = '등급표시'; }
         if (it.grade) {
@@ -99,7 +100,8 @@
         key: it.key || null, id: it.id,
         truthLabels: it.labels || '', detected: detS === '-' ? '' : detS,
         d: Math.round(p1.D * 1000) / 1000, gated: p1.D > GATE,
-        truthGrade: it.grade || null, topGrade: topGrade
+        truthGrade: it.grade || null, topGrade: topGrade,
+        topP: Math.round(topP * 1000) / 1000
       });
     }
 

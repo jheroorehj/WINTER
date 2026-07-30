@@ -1,19 +1,26 @@
 // WINTER 1단계 전처리 — 프로토타입과 임베딩 뱅크 빌더가 함께 쓴다.
 //
+// 이 파일은 학습 파이프라인(build_stage1_preprocess)의 JS 이식이다. 학습 코드를 받아
+// 한 줄씩 대조해 옮겼으므로 추측으로 채운 부분이 없다. 순서는 학습 코드가 정하고,
+// HistogramMatch 의 docstring 이 "반드시 아래 순서로 사용한다"고 못 박고 있다.
+//
+//   1. FOV crop        (grayscale > 12 의 바운딩 박스, 32px 미만이면 크롭하지 않음)
+//   2. square padding  (검은색, 종횡비 유지)
+//   3. resize 224      (bilinear)
+//   4. histogram match (ODIR train 기준 CDF, 마스크는 max(R,G,B) > 12)
+//   5. CLAHE           (green 채널만, clip 2.0, grid 8x8)
+//   6. ToTensor        (uint8 → float32 [0,1])
+//   7. ImageNet 정규화 → NCHW
+//
 // 이 파일이 하나뿐이어야 하는 이유. 이웃 검색은 코사인 유사도 kNN 이므로 뱅크 임베딩과
 // 화면의 쿼리 임베딩이 "같은 전처리"에서 나와야 한다. 전처리를 두 곳에 복사하면 한쪽이
 // 조용히 낡고, kNN 이 서로 다른 공간을 비교하게 된다. 그래서 복사하지 않고 공유한다.
 //
-// 학습 파이프라인과의 정합성은 아직 미검증이다 — README "알려진 문제" 참고.
-
-// ── 전처리 ──────────────────────────────────────────────────────────────
-// 학습 때와 하나라도 다르면 추론이 조용히 틀린다(오류가 나지 않는다). 파이썬 참조
-// 구현은 data/reference_infer.py 에 있고, 두 구현이 같은 텐서를 만드는지 수치로
-// 비교하는 작업이 남아 있다 — README "알려진 문제" 참고.
+// 2단계(Teachable Machine)는 이 전처리를 쓰지 않는다. TM 은 자체 전처리(중앙 정사각
+// 크롭 + [-1,1])로 학습됐으므로 이 파이프라인을 먹이면 이중 처리가 된다.
 //
-// 체인: FOV crop → square pad → resize 224 → histogram match → CLAHE(green) →
-//       ImageNet 정규화 → NCHW
-// 이 "순서"는 preprocessing.json 에 명시돼 있지 않아 가정한 것이다.
+// 남은 비트 단위 차이는 리샘플링 하나다. 학습은 PIL bilinear(축소 시 antialias)이고
+// 브라우저는 drawImage + imageSmoothingQuality='high' 다 — 동일함이 증명되지 않았다.
 
 function loadImage(url) {
   return new Promise((ok, no) => {
@@ -31,15 +38,19 @@ function canvasOf(w, h) {
   return c;
 }
 
-// 안저 원판의 바운딩 박스. 검은 배경을 남기면 정규화 통계가 오염된다.
-function fovBox(data, w, h, thr) {
+// PIL 의 img.convert("L") 과 같은 ITU-R 601-2 휘도. 반올림까지 맞춘다.
+function lumaAt(data, j) {
+  return Math.round(0.299 * data[j] + 0.587 * data[j + 1] + 0.114 * data[j + 2]);
+}
+
+// crop_fov — grayscale > tol 인 영역의 바운딩 박스.
+// 학습 코드에 32px 가드가 있다: 비정상적으로 작은 영역이 검출되면 크롭하지 않는다.
+// 이 가드가 없으면 거의 검은 영상에서 몇 픽셀만 남기고 잘라 버린다.
+function fovBox(data, w, h, tol) {
   let x0 = w, y0 = h, x1 = -1, y1 = -1;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4;
-      // cv2.COLOR_BGR2GRAY 와 같은 계수
-      const g = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-      if (g > thr) {
+      if (lumaAt(data, (y * w + x) * 4) > tol) {
         if (x < x0) x0 = x;
         if (x > x1) x1 = x;
         if (y < y0) y0 = y;
@@ -47,108 +58,110 @@ function fovBox(data, w, h, thr) {
       }
     }
   }
-  return x1 < 0 ? { x: 0, y: 0, w: w, h: h } : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+  if (x1 < 0) return { x: 0, y: 0, w: w, h: h };          // mask.any() == False
+  const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+  if (bh < 32 || bw < 32) return { x: 0, y: 0, w: w, h: h };
+  return { x: x0, y: y0, w: bw, h: bh };
 }
 
-// 채널별 CDF 매칭. 기준 CDF 는 학습셋 512장에서 만든 값이다. 안저 영상은 카메라·
-// 조명에 따라 색조가 크게 흔들리므로 학습셋 색분포로 끌어당겨야 추론 분포가 맞는다.
-// 마스크 밖(검은 배경)은 통계에서 뺀다 — 넣으면 0 이 대량 유입돼 매핑이 무너진다.
+// HistogramMatch — 채널별 CDF 를 ODIR train 기준 CDF 에 맞춘다.
+//
+// 마스크가 휘도가 아니라 max(R,G,B) > threshold 다. 학습 코드가 그렇게 쓴다
+// (array.max(axis=2) > mask_threshold). FOV crop 은 휘도를 쓰고 이쪽은 max 를 쓰는
+// 비대칭이 실제로 존재하므로 맞춰야 한다 — 휘도로 두면 어두운 적색 화소가 배경으로
+// 빠져 통계가 달라진다.
+//
+// uint8 변환은 numpy .astype(np.uint8) 과 같이 절단(floor)이다. 반올림하면 값의
+// 절반가량이 1 gray level 씩 어긋난다.
 function matchHistogram(px, n, ref, blend, thr) {
-  const refCdf = ref.cdf, refVal = ref.values;
-  const mask = new Uint8Array(n * n);
-  for (let i = 0, j = 0; i < n * n; i++, j += 4) {
-    const g = 0.299 * px[j] + 0.587 * px[j + 1] + 0.114 * px[j + 2];
-    mask[i] = g > thr ? 1 : 0;
+  const N = n * n;
+  const fg = new Uint8Array(N);
+  let cnt = 0;
+  for (let i = 0, j = 0; i < N; i++, j += 4) {
+    if (Math.max(px[j], px[j + 1], px[j + 2]) > thr) { fg[i] = 1; cnt++; }
   }
-  for (let ch = 0; ch < 3; ch++) {          // 0=R 1=G 2=B, 기준 CDF 도 RGB 순서
+  if (!cnt) return;                                       // foreground.any() == False
+
+  for (let ch = 0; ch < 3; ch++) {
     const hist = new Float64Array(256);
-    let cnt = 0;
-    for (let i = 0, j = ch; i < n * n; i++, j += 4) {
-      if (mask[i]) { hist[px[j]]++; cnt++; }
-    }
-    if (!cnt) continue;
-    // 소스 CDF → 기준 CDF 역보간으로 LUT 를 만든다
-    const lut = new Float32Array(256);
+    for (let i = 0, j = ch; i < N; i++, j += 4) if (fg[i]) hist[px[j]]++;
+
+    const rc = ref.cdf[ch], rv = ref.values[ch], M = rc.length;
+    const lut = new Float64Array(256);
     let acc = 0, k = 0;
-    const rc = refCdf[ch], rv = refVal[ch];
     for (let v = 0; v < 256; v++) {
-      acc += hist[v] / cnt;
-      while (k < 255 && rc[k] < acc) k++;
-      // np.interp 와 같은 선형 보간
-      if (k === 0) lut[v] = rv[0];
+      acc += hist[v];
+      if (hist[v] === 0) { lut[v] = v; continue; }         // 등장하지 않는 값은 쓰이지 않는다
+      const c = acc / cnt;                                 // source_cdf
+      while (k < M && rc[k] < c) k++;                      // acc 가 단조라 포인터 하나로 충분
+      let m;
+      if (k === 0) m = rv[0];                              // np.interp: 왼쪽 밖은 rv[0]
+      else if (k >= M) m = rv[M - 1];                      // 오른쪽 밖은 rv[-1]
       else {
         const c0 = rc[k - 1], c1 = rc[k];
-        const t = c1 > c0 ? (acc - c0) / (c1 - c0) : 0;
-        lut[v] = rv[k - 1] + t * (rv[k] - rv[k - 1]);
+        const t = c1 > c0 ? (c - c0) / (c1 - c0) : 0;
+        m = rv[k - 1] + t * (rv[k] - rv[k - 1]);
       }
+      lut[v] = blend < 1 ? blend * m + (1 - blend) * v : m;
     }
-    // 매핑은 마스크 안쪽에만 쓴다. 통계는 전경에서 내면서 매핑을 배경까지 덮으면
-    // 검은 배경이 밝은 값으로 칠해진다 — 정사각 패딩 후 배경이 화면의 약 21% 라
-    // 무시할 수 있는 영역이 아니다. 학습 저장소에서 실측한 이탈량 2.50 gray level.
-    for (let i = 0, j = ch; i < n * n; i++, j += 4) {
-      if (!mask[i]) continue;
-      const v = px[j];
-      px[j] = Math.max(0, Math.min(255, Math.round((1 - blend) * v + blend * lut[v])));
+    for (let i = 0, j = ch; i < N; i++, j += 4) {
+      if (fg[i]) px[j] = Math.min(255, Math.max(0, Math.floor(lut[px[j]])));
     }
   }
 }
 
-// CLAHE. cv2.createCLAHE 와 같은 방식이다 — 타일별 히스토그램을 clipLimit 로 자르고
-// 초과분을 균등 재분배한 뒤 CDF LUT 을 만들고, 타일 경계는 이중선형 보간한다.
-// cv2 의 clipLimit 은 정규화된 값이라 실제 자르는 높이는 clip * 타일면적 / 256 이다.
-function clahe(plane, w, h, clipLimit, gx, gy) {
-  const tw = Math.ceil(w / gx), th = Math.ceil(h / gy);
-  const area = tw * th;
-  let clip = Math.max(1, Math.round(clipLimit * area / 256));
-  const luts = new Uint8Array(gx * gy * 256);
+// clahe_channel — 학습 코드의 numpy 구현을 그대로 옮긴다. cv2.createCLAHE 와 다르다.
+//
+//   limit  = max(1.0, clip * tile.size / 256)      실수. 반올림하지 않는다.
+//   재분배 = min(hist, limit) + excess/256          단일 패스. 나머지를 흩뿌리지 않는다.
+//   LUT    = cumsum / max(cumsum[-1], 1e-9) * 255  float32 유지. 중간 반올림 없음.
+//
+// cv2 는 초과분을 정수로 나눠 담고 나머지를 다시 흩뿌리는 2패스라서 값이 갈린다.
+function claheChannel(chan, w, h, clipLimit, gridY, gridX) {
+  const tileY = Math.ceil(h / gridY), tileX = Math.ceil(w / gridX);
+  const luts = new Float32Array(gridY * gridX * 256);
 
-  for (let ty = 0; ty < gy; ty++) {
-    for (let tx = 0; tx < gx; tx++) {
-      const hist = new Int32Array(256);
-      const xs = tx * tw, ys = ty * th;
-      const xe = Math.min(xs + tw, w), ye = Math.min(ys + th, h);
+  for (let iy = 0; iy < gridY; iy++) {
+    for (let ix = 0; ix < gridX; ix++) {
+      const base = (iy * gridX + ix) * 256;
+      const ys = iy * tileY, ye = Math.min((iy + 1) * tileY, h);
+      const xs = ix * tileX, xe = Math.min((ix + 1) * tileX, w);
+      const size = Math.max(0, ye - ys) * Math.max(0, xe - xs);
+      if (size === 0) {                                    // tile.size == 0 → 항등 LUT
+        for (let v = 0; v < 256; v++) luts[base + v] = v;
+        continue;
+      }
+      const hist = new Float64Array(256);
       for (let y = ys; y < ye; y++) {
-        for (let x = xs; x < xe; x++) hist[plane[y * w + x]]++;
+        for (let x = xs; x < xe; x++) hist[chan[y * w + x]]++;
       }
+      const limit = Math.max(1.0, clipLimit * size / 256.0);
       let excess = 0;
-      for (let v = 0; v < 256; v++) if (hist[v] > clip) { excess += hist[v] - clip; hist[v] = clip; }
-      const inc = Math.floor(excess / 256);
-      let rest = excess - inc * 256;
-      for (let v = 0; v < 256; v++) hist[v] += inc;
-      // 남은 픽셀은 cv2 와 같이 일정 간격으로 흩뿌린다
-      if (rest > 0) {
-        const step = Math.max(1, Math.floor(256 / rest));
-        for (let v = 0; v < 256 && rest > 0; v += step) { hist[v]++; rest--; }
-        for (let v = 0; v < 256 && rest > 0; v++) { hist[v]++; rest--; }
-      }
-      const n = (xe - xs) * (ye - ys);
-      const scale = 255 / n;
-      let sum = 0, base = (ty * gx + tx) * 256;
+      for (let v = 0; v < 256; v++) if (hist[v] > limit) excess += hist[v] - limit;
+      const add = excess / 256.0;
+      let cum = 0;
       for (let v = 0; v < 256; v++) {
-        sum += hist[v];
-        luts[base + v] = Math.max(0, Math.min(255, Math.round(sum * scale)));
+        cum += Math.min(hist[v], limit) + add;
+        luts[base + v] = cum;
       }
+      const last = Math.max(luts[base + 255], 1e-9);
+      for (let v = 0; v < 256; v++) luts[base + v] = luts[base + v] / last * 255.0;
     }
   }
 
+  // 인접 네 타일 mapping 의 이중선형 보간. np.clip 후 절단하는 것까지 같다.
   const out = new Uint8Array(w * h);
   for (let y = 0; y < h; y++) {
-    // 타일 중심 기준 좌표
-    let fy = y / th - 0.5, ty0 = Math.floor(fy);
-    let wy = fy - ty0;
-    if (ty0 < 0) { ty0 = 0; wy = 0; }
-    let ty1 = Math.min(ty0 + 1, gy - 1);
-    if (ty0 > gy - 1) { ty0 = ty1 = gy - 1; wy = 0; }
+    const fy = Math.min(Math.max(y / tileY - 0.5, 0), gridY - 1);
+    const y0 = Math.floor(fy), y1 = Math.min(y0 + 1, gridY - 1), wy = fy - y0;
     for (let x = 0; x < w; x++) {
-      let fx = x / tw - 0.5, tx0 = Math.floor(fx);
-      let wx = fx - tx0;
-      if (tx0 < 0) { tx0 = 0; wx = 0; }
-      let tx1 = Math.min(tx0 + 1, gx - 1);
-      if (tx0 > gx - 1) { tx0 = tx1 = gx - 1; wx = 0; }
-      const v = plane[y * w + x];
-      const a = luts[(ty0 * gx + tx0) * 256 + v], b = luts[(ty0 * gx + tx1) * 256 + v];
-      const c = luts[(ty1 * gx + tx0) * 256 + v], d = luts[(ty1 * gx + tx1) * 256 + v];
-      out[y * w + x] = Math.round((a * (1 - wx) + b * wx) * (1 - wy) + (c * (1 - wx) + d * wx) * wy);
+      const fx = Math.min(Math.max(x / tileX - 0.5, 0), gridX - 1);
+      const x0 = Math.floor(fx), x1 = Math.min(x0 + 1, gridX - 1), wx = fx - x0;
+      const v = chan[y * w + x];
+      const m00 = luts[(y0 * gridX + x0) * 256 + v], m01 = luts[(y0 * gridX + x1) * 256 + v];
+      const m10 = luts[(y1 * gridX + x0) * 256 + v], m11 = luts[(y1 * gridX + x1) * 256 + v];
+      const o = (1 - wy) * ((1 - wx) * m00 + wx * m01) + wy * ((1 - wx) * m10 + wx * m11);
+      out[y * w + x] = Math.min(255, Math.max(0, Math.floor(o)));
     }
   }
   return out;
@@ -157,41 +170,44 @@ function clahe(plane, w, h, clipLimit, gx, gy) {
 // 영상 → NCHW Float32Array. meta 는 preprocessing.json + color_reference.json.
 function preprocess(img, meta) {
   const pre = meta.pre, ref = meta.ref;
-  const thr = (ref && ref.mask_threshold !== undefined) ? ref.mask_threshold : 12;
+  const tol = (ref && ref.mask_threshold !== undefined) ? ref.mask_threshold : 12;
   const n = pre.img_size;
 
-  // 1) 원본을 캔버스로
-  let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
-  let cv = canvasOf(w, h), cx = cv.getContext('2d', { willReadFrequently: true });
-  cx.drawImage(img, 0, 0);
+  const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+  const src = canvasOf(w, h), sx = src.getContext('2d', { willReadFrequently: true });
+  sx.drawImage(img, 0, 0);
+
+  // 1. FOV crop
   let box = { x: 0, y: 0, w: w, h: h };
+  if (pre.fov_crop) box = fovBox(sx.getImageData(0, 0, w, h).data, w, h, tol);
 
-  // 2) FOV crop
-  if (pre.fov_crop) box = fovBox(cx.getImageData(0, 0, w, h).data, w, h, thr);
-
-  // 3) square pad + 4) resize 를 한 번의 drawImage 로 합친다. 정사각 캔버스의
-  //    가운데에 크롭 영역을 비율 유지해 그리면 패딩과 리사이즈가 동시에 끝난다.
-  const side = Math.max(box.w, box.h);
+  // 2. square padding — resize 와 합치지 않는다. 학습은 패딩된 정사각 영상을 리샘플하고
+  //    그때 검은 패딩이 경계 픽셀의 필터에 참여한다. 한 번의 drawImage 로 합치면 그
+  //    기여가 사라져 테두리가 달라진다.
   const dst = canvasOf(n, n), dc = dst.getContext('2d', { willReadFrequently: true });
-  // 학습은 PIL bilinear 로 축소하며 antialias 가 켜져 있다. drawImage 의 기본
-  // 품질은 구현에 맡겨져 있어 antialias 없이 줄어들 수 있다(실측 3.17 gray level).
   dc.imageSmoothingEnabled = true;
-  dc.imageSmoothingQuality = 'high';
-  dc.fillStyle = '#000';
-  dc.fillRect(0, 0, n, n);
-  const k = n / side;
-  dc.drawImage(img, box.x, box.y, box.w, box.h,
-               (n - box.w * k) / 2, (n - box.h * k) / 2, box.w * k, box.h * k);
+  dc.imageSmoothingQuality = 'high';                       // 학습은 PIL bilinear(antialias)
 
-  const id = dc.getImageData(0, 0, n, n);
-  const px = id.data;
-
-  // 5) histogram match
-  if (pre.histogram_match && ref && ref.cdf) {
-    matchHistogram(px, n, ref, pre.color_match_blend === undefined ? 1 : pre.color_match_blend, thr);
+  if (pre.square_pad) {
+    const side = Math.max(box.w, box.h);
+    const sq = canvasOf(side, side), qc = sq.getContext('2d', { willReadFrequently: true });
+    qc.fillStyle = '#000';
+    qc.fillRect(0, 0, side, side);
+    qc.drawImage(src, box.x, box.y, box.w, box.h,
+                 Math.floor((side - box.w) / 2), Math.floor((side - box.h) / 2), box.w, box.h);
+    dc.drawImage(sq, 0, 0, side, side, 0, 0, n, n);         // 3. resize 224
+  } else {
+    dc.drawImage(src, box.x, box.y, box.w, box.h, 0, 0, n, n);
   }
 
-  // 6) CLAHE — green 채널만이 기본이다. 안저에서 병변 대비가 가장 큰 채널이다.
+  const px = dc.getImageData(0, 0, n, n).data;
+
+  // 4. histogram match
+  if (pre.histogram_match && ref && ref.cdf) {
+    matchHistogram(px, n, ref, pre.color_match_blend === undefined ? 1 : pre.color_match_blend, tol);
+  }
+
+  // 5. CLAHE — green 채널만이 기본이다. 안저에서 병변 대비가 가장 큰 채널이다.
   if (pre.clahe) {
     const grid = pre.clahe_grid || [8, 8];
     const chans = pre.clahe_green_only ? [1] : [0, 1, 2];
@@ -199,12 +215,12 @@ function preprocess(img, meta) {
       const ch = chans[ci];
       const plane = new Uint8Array(n * n);
       for (let i = 0, j = ch; i < n * n; i++, j += 4) plane[i] = px[j];
-      const eq = clahe(plane, n, n, pre.clahe_clip_limit, grid[0], grid[1]);
+      const eq = claheChannel(plane, n, n, pre.clahe_clip_limit, grid[0], grid[1]);
       for (let i = 0, j = ch; i < n * n; i++, j += 4) px[j] = eq[i];
     }
   }
 
-  // 7) ImageNet 정규화 → NCHW
+  // 6-7. ToTensor + ImageNet 정규화 → NCHW
   const mean = pre.imagenet_mean || [0, 0, 0], std = pre.imagenet_std || [1, 1, 1];
   const out = new Float32Array(3 * n * n);
   const plane = n * n;
