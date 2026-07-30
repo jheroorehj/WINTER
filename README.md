@@ -484,6 +484,13 @@ python3 data/make_embed_model.py
   → stage1_odir_convnextv2_tiny_int8_embed.onnx  (28.5 MB, .gitignore 대상)
 ```
 
+이미 HF 에 올려 두었으니 받아 써도 됩니다. 같은 파일이고 `manifest.json` 에 sha256 이 있습니다.
+
+```
+hf download HEROJ137/WINTER-retina-models \
+    stage1_odir_convnextv2_tiny_int8_embed.onnx --local-dir data/model
+```
+
 노드·가중치를 하나도 건드리지 않으므로 `logits` 는 **비트 단위로 같아야 하고**, 스크립트가 그것을 검증합니다(`max|diff| = 0`). 같지 않으면 산출물을 지우고 실패합니다. 원본 파일은 그대로 남습니다.
 
 > [!NOTE]

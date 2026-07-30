@@ -166,8 +166,11 @@ def knn(items, ids, raw, k):
 
 def main():
     if not os.path.exists(EMBED_MODEL):
-        sys.exit('임베딩 출력 모델이 없습니다: %s\n먼저 만드세요: python3 data/make_embed_model.py'
-                 % EMBED_MODEL)
+        sys.exit('임베딩 출력 모델이 없습니다: %s\n'
+                 '받거나 만드세요 (둘 다 같은 파일이고 sha256 이 manifest 에 있습니다):\n'
+                 '  hf download HEROJ137/WINTER-retina-models \\\n'
+                 '      stage1_odir_convnextv2_tiny_int8_embed.onnx --local-dir data/model\n'
+                 '  python3 data/make_embed_model.py' % EMBED_MODEL)
     if not os.path.exists(SRC_LABELS):
         sys.exit('원본 라벨이 없습니다: %s\n데이터셋을 가진 로컬에서 실행하세요.' % SRC_LABELS)
 
