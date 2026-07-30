@@ -120,7 +120,6 @@
           <span class="tag" style="border: 1px solid var(--color-accent); color: var(--color-accent-300);">OS</span>
           <span class="num" style="font-size: 11px; color: var(--color-neutral-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ p.os.file }}</span>
           <span style="font-size: 11px; color: var(--color-neutral-400); white-space: nowrap;">화질 {{ p.os.quality }}</span>
-          <span style="font-size: 11px; color: var(--color-neutral-500); white-space: nowrap;">표시 {{ p.os.shown }} · 모델 입력 224 전처리</span>
           <span class="num" style="font-size: 11px; color: var(--color-neutral-500); white-space: nowrap;">이웃 라벨 일치 {{ agreeOS }}</span>
         </div>
         <div style="display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;">
@@ -165,7 +164,6 @@
           <span class="tag" style="border: 1px solid var(--color-accent); color: var(--color-accent-300);">OD</span>
           <span class="num" style="font-size: 11px; color: var(--color-neutral-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ p.od.file }}</span>
           <span style="font-size: 11px; color: var(--color-neutral-400); white-space: nowrap;">화질 {{ p.od.quality }}</span>
-          <span style="font-size: 11px; color: var(--color-neutral-500); white-space: nowrap;">표시 {{ p.od.shown }} · 모델 입력 224 전처리</span>
           <span class="num" style="font-size: 11px; color: var(--color-neutral-500); white-space: nowrap;">이웃 라벨 일치 {{ agreeOD }}</span>
         </div>
         <div style="display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;">
@@ -354,7 +352,7 @@
            2단계는 "DR 아님" 등급이 학습 데이터에 없어 정상을 말할 수 없다 —
            1단계가 D 를 오탐하면 2단계는 그 위에서 등급을 붙인다. 그 사실이 화면에 없으면
            등급이 단독 결론으로 읽힌다. -->
-      <div style="font-size: 11px; line-height: 1.6; color: var(--color-neutral-500); text-wrap: pretty;">본 결과는 공개 안저 데이터(1단계 6클래스 · ODIR-5K 계열, 2단계 DR 4등급 · IDRiD)로 학습된 보조 도구의 통계적 추정치이며 진단이 아닙니다. 최종 판단은 의료진의 임상 소견에 따릅니다. 2단계 등급은 <b style="font-weight: 500; color: var(--color-neutral-400);">1단계가 당뇨망막병증을 의심한 경우의 조건부 추정</b>이며, 학습 데이터에 "DR 아님" 등급이 없어 2단계 단독으로는 정상을 판정할 수 없습니다. 낮은 화질·산동 부족·주변부 미포함 영상에서는 신뢰도가 저하됩니다.</div>
+      <div style="font-size: 11px; line-height: 1.6; color: var(--color-neutral-500); text-wrap: pretty;">본 결과는 공개 안저 데이터(1단계 6클래스 · ODIR-5K 계열, 2단계 DR 4등급 · IDRiD)로 학습된 보조 도구의 통계적 추정치이며 진단이 아닙니다. 최종 판단은 의료진의 임상 소견에 따릅니다. 2단계 등급은 <b style="font-weight: 500; color: var(--color-neutral-400);">1단계가 당뇨망막병증을 의심한 경우의 조건부 추정</b>이며, 학습 데이터에 "DR 아님" 등급이 없어 2단계 단독으로는 정상을 판정할 수 없습니다. 낮은 화질·산동 부족·주변부 미포함 영상에서는 신뢰도가 저하됩니다. 화면의 사진은 가능한 경우 촬영 원본이며(원본이 없는 데이터셋은 전처리본), 모델 입력은 224×224 전처리본입니다.</div>
     </div>
 
     <div style="display: flex; gap: var(--space-2); padding: var(--space-4) var(--space-6); flex-shrink: 0;">
@@ -1174,11 +1172,9 @@ function buildPatient(sc, preds) {
     chartNo: sc.chartNo, visit: sc.visitDate, site: sc.site,
     vitals: vitals(sc),
     os: { file: sc.osSourceFile, quality: sc.osArtifact ? '보통 · ' + sc.osArtifact : '양호',
-          preds: osPreds, dr: osDr, img: displayImg(sc, 'os'),
-          shown: sc.osDisplay ? '원본' : '데이터셋 전처리본' },
+          preds: osPreds, dr: osDr, img: displayImg(sc, 'os') },
     od: { file: sc.odSourceFile, quality: sc.odArtifact ? '보통 · ' + sc.odArtifact : '양호',
-          preds: odPreds, dr: odDr, img: displayImg(sc, 'od'),
-          shown: sc.odDisplay ? '원본' : '데이터셋 전처리본' },
+          preds: odPreds, dr: odDr, img: displayImg(sc, 'od') },
     simOS: neighbors(sc, 'os', osPreds), simOD: neighbors(sc, 'od', odPreds),
     referrals: cl.referrals, tests: cl.tests, systemic: cl.systemic, notes: cl.notes,
     patientLine: sc.patientLine
