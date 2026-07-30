@@ -33,7 +33,7 @@ DATA = os.path.join(ROOT, 'data')
 PAGE = os.path.join(DATA, 'verify_models.html')
 LIST = os.path.join(DATA, '_verify_list.json')
 STATUS = os.path.join(DATA, 'model_status.json')
-DR_DIR = os.path.join(ROOT, 'Diabetic retinopathy')
+DR_DIR = os.path.join(ROOT, 'val')      # 2단계 모델의 검증 분할
 
 # 화면이 쓰는 것과 같은 주소여야 한다. 프로토타입의 MODEL_URL / DR_MODEL_BASE 와 맞춰 둔다.
 STAGE1_URL = ('https://huggingface.co/HEROJ137/WINTER-retina-models'
@@ -69,8 +69,9 @@ def build_items(n_idrid):
                     'labels': r[tag + '_labels'],
                     'grade': int(g) if g else None,
                 })
-    # IDRiD 등급 폴더는 2단계의 학습 도메인으로 추정된다. 여기서 틀리면 모델 문제다.
-    for grade in (1, 2, 3, 4):
+    # val/ 은 2단계 모델의 검증 분할이다. grading_0 도 넣는다 — 1단계가 D 를 붙이지
+    # 않아야 하고 2단계도 grade0 을 내야 하는 눈이라, 두 모델의 반대 방향 오류가 보인다.
+    for grade in (0, 1, 2, 3, 4):
         d = os.path.join(DR_DIR, 'grading_%d' % grade)
         if not os.path.isdir(d):
             continue
@@ -78,7 +79,8 @@ def build_items(n_idrid):
             items.append({
                 'id': 'grading_%d/%s' % (grade, os.path.basename(p)),
                 'url': '../' + os.path.relpath(p, ROOT).replace(os.sep, '/'),
-                'labels': 'D', 'grade': grade,
+                # grading_0 은 DR 이 없는 눈이므로 1단계 정답에 D 가 없다.
+                'labels': 'D' if grade else 'N', 'grade': grade or None,
             })
     return items
 

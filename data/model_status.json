@@ -1,5 +1,5 @@
 {
- "measuredAt": "2026-07-30 11:49",
+ "measuredAt": "2026-07-30 12:03",
  "stage1Url": "https://huggingface.co/HEROJ137/WINTER-retina-models/resolve/main/stage1_odir_convnextv2_tiny_int8.onnx",
  "stage2Base": "https://teachablemachine.withgoogle.com/models/PmdZHe7ke/",
  "note": "현재 모델이 시나리오 정답을 재현하는지의 측정 결과다. 시나리오 이름은 정답을 그대로 두고 이 배지로 상태를 표시한다 — 정답은 모델이 틀려도 사실이고 정확도 평가에 필요하다. 모델을 재학습하면 python3 data/verify_models.py 를 다시 돌려 갱신할 것.",
@@ -91,17 +91,17 @@
   },
   "4": {
    "tags": [
-    "1단계 일치",
+    "1단계 불일치",
     "2단계 불일치"
    ],
-   "badge": "1단계 일치 · 2단계 불일치",
+   "badge": "1단계 불일치 · 2단계 불일치",
    "eyes": {
     "os": {
      "key": "4|os",
      "id": "s4-os (IDRiD)",
      "truthLabels": "D",
      "detected": "D",
-     "d": 0.595,
+     "d": 0.612,
      "gated": true,
      "truthGrade": 2,
      "topGrade": 0
@@ -110,11 +110,11 @@
      "key": "4|od",
      "id": "s4-od (IDRiD)",
      "truthLabels": "D",
-     "detected": "D",
-     "d": 0.597,
+     "detected": "D|O",
+     "d": 0.562,
      "gated": true,
      "truthGrade": 2,
-     "topGrade": 0
+     "topGrade": 3
     }
    }
   },
@@ -130,7 +130,7 @@
      "id": "s5-os (IDRiD)",
      "truthLabels": "D",
      "detected": "D",
-     "d": 0.616,
+     "d": 0.565,
      "gated": true,
      "truthGrade": 1,
      "topGrade": 0
@@ -216,7 +216,7 @@
      "id": "s8-os (IDRiD)",
      "truthLabels": "D",
      "detected": "D",
-     "d": 0.555,
+     "d": 0.576,
      "gated": true,
      "truthGrade": 1,
      "topGrade": 0
@@ -236,26 +236,26 @@
   "9": {
    "tags": [
     "1단계 불일치",
-    "2단계 부분일치"
+    "2단계 일치"
    ],
-   "badge": "1단계 불일치 · 2단계 부분일치",
+   "badge": "1단계 불일치 · 2단계 일치",
    "eyes": {
     "os": {
      "key": "9|os",
      "id": "s9-os (IDRiD)",
      "truthLabels": "D",
-     "detected": "D",
-     "d": 0.61,
+     "detected": "D|O",
+     "d": 0.616,
      "gated": true,
      "truthGrade": 3,
-     "topGrade": 0
+     "topGrade": 3
     },
     "od": {
      "key": "9|od",
      "id": "s9-od (IDRiD)",
      "truthLabels": "D",
      "detected": "D|O",
-     "d": 0.612,
+     "d": 0.611,
      "gated": true,
      "truthGrade": 2,
      "topGrade": 2
@@ -264,30 +264,30 @@
   },
   "10": {
    "tags": [
-    "1단계 일치",
-    "2단계 불일치"
+    "1단계 불일치",
+    "2단계 일치"
    ],
-   "badge": "1단계 일치 · 2단계 불일치",
+   "badge": "1단계 불일치 · 2단계 일치",
    "eyes": {
     "os": {
      "key": "10|os",
      "id": "s10-os (IDRiD)",
      "truthLabels": "D",
      "detected": "D",
-     "d": 0.631,
+     "d": 0.635,
      "gated": true,
      "truthGrade": 3,
-     "topGrade": 0
+     "topGrade": 3
     },
     "od": {
      "key": "10|od",
      "id": "s10-od (IDRiD)",
      "truthLabels": "D",
-     "detected": "D",
-     "d": 0.594,
+     "detected": "D|O",
+     "d": 0.62,
      "gated": true,
      "truthGrade": 4,
-     "topGrade": 0
+     "topGrade": 4
     }
    }
   }

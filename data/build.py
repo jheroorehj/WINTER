@@ -8,7 +8,7 @@
 그래서 시나리오도 눈별로 "1단계 라벨"과 "2단계 등급"을 함께 들고 있어야 한다.
 등급 정답은 두 곳에서 나온다.
   ODIR 키워드   'mild/moderate/severe nonproliferative', 'proliferative' → 1/2/3/4
-  IDRiD 폴더    Diabetic retinopathy/grading_N/ 의 N
+  IDRiD 폴더    val/grading_N/ 의 N (2단계 모델의 검증 분할)
 
 D 단독 눈은 영상을 IDRiD 쪽으로 교체한다(DR_IMAGE_SWAP 참고). 2단계 모델이
 IDRiD 로 학습되므로 시연 영상도 같은 분포에 두고, 등급 정답을 폴더로 검증할 수 있다.
@@ -17,7 +17,8 @@ IDRiD 로 학습되므로 시연 영상도 같은 분포에 두고, 등급 정�
 
 원본 데이터셋(test_dataset_seed42/, archive/)은 .gitignore 로 제외돼 있어
 클린 클론에서는 실행되지 않는다. 데이터셋을 가진 로컬에서만 돌린다.
-(Diabetic retinopathy/ 는 224x224 로 이미 줄여진 65장이라 저장소에 들어 있다.)
+(val/ 은 240x240 으로 이미 줄여진 57장이라 저장소에 들어 있다. 2단계 모델의 검증
+분할이며, 이전에 쓰던 Diabetic retinopathy/ 65장(*test.jpg)과는 파일명 교집합이 0이다.)
 
     python3 data/build.py            # 저장소 루트에서
 
@@ -29,7 +30,7 @@ import csv, json, os, shutil, sys, collections
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC_LABELS = os.path.join(ROOT, 'test_dataset_seed42', 'test_labels.csv')
 SRC_IMAGES = os.path.join(ROOT, 'archive', 'preprocessed_images')   # 512x512 전처리본
-DR_DIR = os.path.join(ROOT, 'Diabetic retinopathy')                 # 224x224 IDRiD 등급 영상
+DR_DIR = os.path.join(ROOT, 'val')                                  # 240x240 IDRiD 등급 영상 (2단계 검증 분할)
 OUT_DIR = os.path.join(ROOT, 'data')
 OUT_IMAGES = os.path.join(OUT_DIR, 'images')
 
@@ -62,9 +63,12 @@ SIX = ['N', 'D', 'G', 'A', 'H', 'O']          # 1단계 모델이 추론하는 �
 OUT_OF_SET = {'C', 'M'}                        # 6클래스 밖 — 시연에서 제외
 
 # ── 2단계: 당뇨망막병증 중증도 ───────────────────────────────────────────
-# 국제 임상 분류(ICDR)와 같은 4단계이며 Diabetic retinopathy/grading_N/ 의 N 과 1:1.
-# grading_0(당뇨망막병증 없음)은 데이터셋에 없다 — 2단계 모델은 "정상"을 말할 수 없고
-# 1단계가 D 를 의심한 눈에만 조건부로 돌아간다. 화면도 그렇게 표시해야 한다.
+# 국제 임상 분류(ICDR)와 같은 4단계이며 val/grading_N/ 의 N 과 1:1.
+#
+# val/ 에는 grading_0(DR 없음) 17장도 있지만 여기서는 쓰지 않는다. 시나리오의 D 눈은
+# 정의상 당뇨망막병증이 있는 눈이므로 0등급을 배정할 일이 없다. grading_0 은 2단계
+# 모델이 "DR 아님"을 말할 수 있다는 뜻이고, 그건 화면 쪽 계약이다(1단계와 불일치할 때
+# 병기를 붙이지 않는다). verify_models.py 는 grading_0 도 검증에 쓴다.
 DR_GRADES = {
     1: 'Mild NPDR · 경증 비증식',
     2: 'Moderate NPDR · 중등도 비증식',
