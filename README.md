@@ -526,31 +526,45 @@ python3 data/reference_infer.py          # 시연 영상 20장 추론
 - 화면에서 `D` 를 "의심"이 아니라 "배제 필요"로 다르게 표현한다 → 코드 변경 작지만 카피 재설계
 - 그대로 두고 시연에서 설명한다 → 케이스 1의 `proves` 문구를 고쳐야 함
 
-### 2. 전처리가 파이썬 참조 구현과 정확히 일치하지 않습니다
+### 2. 브라우저 전처리가 학습과 일치하는지 **아직 측정되지 않았습니다**
 
-같은 영상에 대해 브라우저와 `data/reference_infer.py` 가 다른 값을 냅니다. 실측 최대 차이는 약 **0.085** 입니다.
+> [!NOTE]
+> **이 항목의 이전 서술은 틀렸습니다.** "브라우저 vs 파이썬 최대 0.085" 라고 적어 두었는데, 그 파이썬 쪽(`reference_infer.py` 초기 버전)이 `cv2` 로 전처리를 **다시 구현**한 것이어서 학습과 달랐습니다. 즉 0.085 는 브라우저 오차가 아니라 **참조 구현 자신의 오차**를 측정한 값이었습니다. `reference_infer.py` 는 이제 학습 코드를 그대로 import 하며 학습과 bit-identical(`max|d| = 0`)로 검증됐습니다.
 
-| 영상 | 클래스 | 파이썬 | 브라우저 |
+학습 저장소에서 실측된 이탈량입니다. 잘못된 참조 구현이 어디서 갈라졌는지의 기록이고, **브라우저 구현도 같은 함정을 공유합니다.**
+
+| 갈라진 지점 | 이탈량 |
+| --- | --- |
+| `cv2.resize(INTER_LINEAR)` — 축소 시 antialias 없음. 학습은 PIL bilinear(있음) | 3.17 gray lv |
+| histogram match 가 통계는 마스크로 내면서 **매핑을 배경까지 덮어씀** | 2.50 gray lv |
+| CLAHE — 학습은 `src/augment.py` 의 numpy 단일패스 재분배, `cv2.createCLAHE` 와 다름 | 미측정 |
+| 판정에 `>=` 사용 — 학습은 strict `>` (`apply_thresholds`) | 1 ULP |
+
+브라우저 쪽에서 고친 것 셋입니다(`fix/browser-preproc-parity`).
+
+- **histogram match 를 마스크 안쪽에만 적용.** 같은 버그가 JS 에도 있었습니다. 정사각 패딩 후 배경이 화면의 약 21% 라 무시할 수 있는 영역이 아닙니다.
+- **임계 비교를 strict `>` 로.** 검출·게이트·단안 판정 전부.
+- **`imageSmoothingQuality = 'high'`.** `drawImage` 의 기본 품질은 구현에 맡겨져 있어 antialias 없이 축소될 수 있습니다.
+
+수정 전후 실측(케이스 1):
+
+| 영상 | 클래스 | 수정 전 | 수정 후 |
 | --- | --- | --- | --- |
-| `s1-os.jpg` | A | 0.815 | 0.730 |
-| `s1-os.jpg` | N | 0.609 | 0.546 |
-| `s1-od.jpg` | G | 0.637 | 0.593 |
+| `s1-od.jpg` | N | 0.690 | 0.707 |
+| `s1-od.jpg` | G | 0.593 | 0.609 |
+| `s1-os.jpg` | G | 0.585 | 0.616 |
 
-이 케이스들에서는 검출 결과가 바뀌지 않았지만, **0.085 는 임계값을 뒤집을 수 있는 크기입니다**(`A` 는 0.87, `D` 는 0.52). 원인 후보:
+**여전히 미검증입니다.** 값이 움직였다는 것만 확인했고, 학습과 같아졌다는 증명이 아닙니다. CLAHE 는 `cv2` 방식(2패스 재분배)으로 남아 있어 학습의 numpy 구현과 다를 수 있습니다.
 
-- **resize 보간** — 브라우저는 `drawImage`(구현 의존), 파이썬은 `cv2.INTER_LINEAR`
-- **CLAHE 잔여 픽셀 재분배** — `cv2` 의 내부 처리와 JS 구현이 완전히 같지 않을 수 있음
-- **histogram match 보간** — `np.interp` 와 JS 구현의 경계 처리
+### 3. 전처리 **순서** — 계약이 아직 v1 입니다
 
-### 3. 전처리 **순서**가 검증되지 않았습니다
-
-`preprocessing.json` 에는 어떤 단계를 켜는지만 있고 **순서가 없습니다.** 현재 두 구현 모두 아래 순서를 가정했습니다.
+순서를 정의하는 당사자는 학습 저장소의 `build_transforms6(train=False)` 이고, 브라우저는 아래 순서를 가정해 구현했습니다.
 
 ```
 FOV crop → square pad → resize 224 → histogram match → CLAHE(green) → ImageNet 정규화 → NCHW
 ```
 
-**학습 스크립트와 대조해 확인해야 합니다.** 순서가 다르면 오류 없이 조용히 틀립니다.
+`preprocessing.json` 은 아직 **v1 이고 `order` 필드가 없습니다.** 그래서 브라우저 구현자는 순서를 추측해야 합니다 — **계약을 v2 로 올려 `order` 를 명시해야 합니다.** 순서가 다르면 오류 없이 조용히 틀립니다.
 
 ### 4. 시연 20장 정확도가 낮습니다
 
@@ -569,8 +583,14 @@ FOV crop → square pad → resize 224 → histogram match → CLAHE(green) → 
 
 ### 남은 작업 (담당 배정 필요)
 
-- [ ] **전처리 수치 검증** — `python3 data/reference_infer.py --dump-tensor s1-os.jpg` 로 파이썬 텐서를 저장하고, 브라우저에서 같은 영상의 텐서를 뽑아 요소별 최대 오차를 비교. 20장 전부에 대해 허용 오차(제안: 1e-2)를 정하고 통과시킬 것
-- [ ] **전처리 순서 확정** — 학습 스크립트와 대조
+- [ ] **브라우저 전처리 수치 검증** — 기준은 학습 코드를 import 하는 `data/reference_infer.py` 입니다. 학습 저장소(`model/`)가 필요합니다.
+  ```
+  export WINTER_MODEL_REPO=../model
+  python3 data/reference_infer.py --dump-stages out/ --dump-tensor s1-os.jpg
+  ```
+  단계별 `.npy` 가 나오므로 브라우저에서 같은 지점을 덤프해 순서대로 비교하면 **처음 어긋나는 단계가 곧 고쳐야 할 단계**입니다. 20장 전부에 대해 허용 오차(제안: 1e-2)를 정하고 통과시킬 것
+- [ ] **JS CLAHE 를 학습 구현에 맞추기** — 현재 `cv2` 방식(2패스 재분배)이고 학습은 `src/augment.py` 의 numpy 단일패스입니다. 위 `--dump-stages` 의 `4_after_clahe_green` 이 비교 기준
+- [ ] **`preprocessing.json` 을 v2 로 — `order` 필드 추가** (학습 담당). 없으면 브라우저 구현자가 계속 순서를 추측해야 합니다
 - [ ] **홀드아웃 전체 정확도·민감도·특이도 측정** (배점 1.3)
 - [ ] **`D` 과탐 대응 방향 결정** (위 1번 세 선택지)
 - [ ] 2단계 모델 학습 → `data/model-dr/` + HF 업로드 → `DR_MODEL.load()` 채우기

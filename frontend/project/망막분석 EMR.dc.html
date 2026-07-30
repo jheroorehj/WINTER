@@ -758,7 +758,11 @@ function matchHistogram(px, n, ref, blend, thr) {
         lut[v] = rv[k - 1] + t * (rv[k] - rv[k - 1]);
       }
     }
+    // 매핑은 마스크 안쪽에만 쓴다. 통계는 전경에서 내면서 매핑을 배경까지 덮으면
+    // 검은 배경이 밝은 값으로 칠해진다 — 정사각 패딩 후 배경이 화면의 약 21% 라
+    // 무시할 수 있는 영역이 아니다. 학습 저장소에서 실측한 이탈량 2.50 gray level.
     for (let i = 0, j = ch; i < n * n; i++, j += 4) {
+      if (!mask[i]) continue;
       const v = px[j];
       px[j] = Math.max(0, Math.min(255, Math.round((1 - blend) * v + blend * lut[v])));
     }
@@ -845,6 +849,10 @@ function preprocess(img, meta) {
   //    가운데에 크롭 영역을 비율 유지해 그리면 패딩과 리사이즈가 동시에 끝난다.
   const side = Math.max(box.w, box.h);
   const dst = canvasOf(n, n), dc = dst.getContext('2d', { willReadFrequently: true });
+  // 학습은 PIL bilinear 로 축소하며 antialias 가 켜져 있다. drawImage 의 기본
+  // 품질은 구현에 맡겨져 있어 antialias 없이 줄어들 수 있다(실측 3.17 gray level).
+  dc.imageSmoothingEnabled = true;
+  dc.imageSmoothingQuality = 'high';
   dc.fillStyle = '#000';
   dc.fillRect(0, 0, n, n);
   const k = n / side;
@@ -1060,7 +1068,7 @@ function inferScenario(sc) {
   // 넘지 않은 눈에 등급을 붙이면 근거 없는 병기가 되므로 null 로 남긴다.
   const grade = (eye, pairs) => {
     const d = (pairs.find(x => x[0] === 'D') || [])[1] || 0;
-    if (d < DR_GATE) return Promise.resolve(null);
+    if (!(d > DR_GATE)) return Promise.resolve(null);   // 학습과 같은 strict >
     return DR_MODEL.infer(
       IMG + sc[eye + 'Image'],
       { grade: sc[eye === 'os' ? 'osDrGrade' : 'odDrGrade'], seed: sc.scenario_no + eye + 'dr' }
@@ -1134,7 +1142,7 @@ function clinical(sc, osPreds, odPreds, osDr, odDr) {
   const found = {};
   [['os', osPreds], ['od', odPreds]].forEach(pair => {
     pair[1].forEach(d => {
-      if (d[0] === 'N' || d[1] < thrOf(d[0])) return;
+      if (d[0] === 'N' || !(d[1] > thrOf(d[0]))) return;
       (found[d[0]] || (found[d[0]] = { code: d[0], os: 0, od: 0 }))[pair[0]] = d[1];
     });
   });
@@ -1209,7 +1217,7 @@ function clinical(sc, osPreds, odPreds, osDr, odDr) {
 
   // (1) 동반 소견 — 한 환자가 한 가지 병만 갖고 있다고 가정하지 않는다.
   if (codes.length > 1) {
-    const perEye = (eye) => codes.filter(c => found[c][eye] >= thrOf(c));
+    const perEye = (eye) => codes.filter(c => found[c][eye] > thrOf(c));
     const o = perEye('os'), d = perEye('od');
     const solo = codes.filter(c => !(found[c].os && found[c].od));
     const parts = [];
@@ -1366,12 +1374,12 @@ class Component extends DCLogic {
     const other = eye === 'os' ? 'od' : 'os';
     const otherAt = (code) => (p[other].preds.find(d => d[0] === code) || [])[1] || 0;
 
-    return p[eye].preds.filter(d => d[0] !== 'N' && d[1] >= thrOf(d[0])).map(d => {
+    return p[eye].preds.filter(d => d[0] !== 'N' && d[1] > thrOf(d[0])).map(d => {
       const code = d[0], isD = code === 'D';
-      const solo = otherAt(code) < thrOf(code);
+      const solo = !(otherAt(code) > thrOf(code));
       // 게이트를 넘었는데 등급이 없으면 2단계 모델이 없는 것이고, 못 넘었으면
       // 돌리지 않은 것이다. 화면에서 두 상태를 구분해야 한다.
-      const gated = isD && !dr && d[1] >= DR_GATE;
+      const gated = isD && !dr && d[1] > DR_GATE;
       return {
         code: code,
         label: LABELS[code] || code,
