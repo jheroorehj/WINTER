@@ -40,12 +40,26 @@ DATA = os.path.join(ROOT, 'data')
 SRC_LABELS = os.path.join(ROOT, 'test_dataset_seed42', 'test_labels.csv')
 SRC_IMAGES = os.path.join(ROOT, 'archive', 'preprocessed_images')
 DR_DIR = os.path.join(ROOT, 'test')
+SRC_RAW = os.path.join(ROOT, 'test_dataset_seed42', 'images')   # 화면에 보여줄 원본
 OUT_IMAGES = os.path.join(DATA, 'variants')
 PICK = os.path.join(DATA, 'variant_pick.json')
 LIST = os.path.join(DATA, '_verify_list.json')
 PAGE = os.path.join(DATA, 'verify_models.html')
 
 MAX_VARIANTS = 5
+
+# 원본 화질 하한. 이 아래는 후보에서 제외한다.
+#
+# 왜 필요한가. 화면에는 원본을 보여주는데 ODIR 원본 중 상당수가 색수차·반사광·저채도로
+# 덮여 있다. 모델 정확도만으로 고르면 "양안 정상"인데 사진이 무지개색인 케이스가
+# 뽑히고, 임상의가 보면 판정을 신뢰하지 않는다.
+#
+# 지표는 눈으로 본 좋음/나쁨 10건을 재현하도록 맞췄다. 이상색(안저 색역을 벗어난
+# 채도 있는 화소 비율)과 저채도를 벌점, green 라플라시안 분산(초점·혈관 가시성)을
+# 가점으로 둔다. 명확히 나쁜 4건이 -8.8 ~ -34, 좋은 5건이 -2.0 ~ +2.7 로 갈렸다.
+# 반사광은 이 지표로 잡히지 않는다 — 완전한 화질 평가가 아니라 하한 필터다.
+QUALITY_MIN = -5.0
+QUALITY_CANDIDATES = 40        # 화질을 계산해 볼 환자 후보 수 (모델 측정보다 훨씬 싸다)
 STAGE1_URL = ('https://huggingface.co/HEROJ137/WINTER-retina-models'
               '/resolve/main/stage1_odir_convnextv2_tiny_int8.onnx')
 STAGE2_BASE = 'https://teachablemachine.withgoogle.com/models/PmdZHe7ke/'
@@ -98,12 +112,50 @@ def holdout(b):
     return out
 
 
+def display_quality(path):
+    """화면에 보여줄 영상의 화질. 높을수록 좋다. 지표 근거는 QUALITY_MIN 주석 참고."""
+    try:
+        import numpy as np
+        from PIL import Image
+    except ImportError:
+        return 0.0                      # 의존성이 없으면 필터를 끈다 (막지 않는다)
+    try:
+        im = Image.open(path).convert('RGB')
+    except Exception:
+        return -999.0
+    if max(im.size) > 900:              # 지표를 크기에 무관하게
+        im = im.resize((900, max(1, int(900 * im.size[1] / im.size[0]))))
+    a = np.asarray(im).astype(np.float32)
+    m = a.max(axis=2) > 12
+    if m.sum() < 1000:
+        return -999.0
+    hsv = np.asarray(im.convert('HSV')).astype(np.float32)
+    H = hsv[:, :, 0][m] / 255.0 * 360
+    S = hsv[:, :, 1][m] / 255.0
+    # 안저 색역은 붉은-주황이다. 채도가 있는데 그 밖이면 색수차·색조 이상이다.
+    off = float(((S > 0.15) & (((H > 55) & (H < 200)) | ((H >= 200) & (H < 320)))).mean())
+    dull = float((S < 0.25).mean())
+    g = a[:, :, 1]
+    lap = g[1:-1, 2:] + g[1:-1, :-2] + g[2:, 1:-1] + g[:-2, 1:-1] - 4 * g[1:-1, 1:-1]
+    focus = float(lap[m[1:-1, 1:-1]].std())
+    return focus / 6.0 - off * 200 - dull * 20
+
+
+def raw_or_model_path(pid, side, fallback):
+    """화면에 보이는 파일. ODIR 은 원본, IDRiD 는 원본이 없어 모델 입력과 같다."""
+    p = os.path.join(SRC_RAW, '%s_%s.jpg' % (pid, side))
+    return p if os.path.exists(p) else fallback
+
+
 def dr_pool():
     pool = {}
     for g in (1, 2, 3, 4):
         d = os.path.join(DR_DIR, 'grading_%d' % g)
-        pool[g] = sorted(os.path.basename(p) for p in glob.glob(os.path.join(d, '*.jpg'))) \
+        files = sorted(os.path.basename(p) for p in glob.glob(os.path.join(d, '*.jpg'))) \
             if os.path.isdir(d) else []
+        # 화질 좋은 것부터. IDRiD 는 원본이 없어 이 파일이 곧 화면에 보이는 것이다.
+        files.sort(key=lambda f: -display_quality(os.path.join(d, f)))
+        pool[g] = files
     return pool
 
 
@@ -120,6 +172,28 @@ def make_variants(b, scen, pats, pool):
     cand.sort(key=lambda p: (abs(p['age'] - base_age), p['pid']))
     if not cand:
         return []
+
+    # 원본 화질을 먼저 계산해 걸러낸다. 모델 측정보다 훨씬 싸므로 이 순서가 맞다.
+    # 나이가 가까운 순으로 QUALITY_CANDIDATES 개만 본다 — 138명 전수는 불필요하다.
+    scored = []
+    for p in cand[:QUALITY_CANDIDATES]:
+        q = min(display_quality(raw_or_model_path(
+                    p['pid'], 'left' if t == 'os' else 'right',
+                    os.path.join(SRC_IMAGES, '%s_%s.jpg' % (p['pid'], 'left' if t == 'os' else 'right'))))
+                for t in ('os', 'od'))
+        scored.append((q, p))
+    keep = [p for q, p in scored if q >= QUALITY_MIN]
+    if keep:
+        # 화질 통과분 안에서 다시 나이 근접 순 — 화질은 하한이고 정렬 기준이 아니다.
+        order = {id(p): i for i, (q, p) in enumerate(sorted(scored, key=lambda x: -x[0]))}
+        keep.sort(key=lambda p: (abs(p['age'] - base_age), p['pid']))
+        cand = keep
+    else:
+        # 전부 하한 미달이면 가장 나은 것들로 진행하고 사실을 알린다.
+        scored.sort(key=lambda x: -x[0])
+        cand = [p for q, p in scored]
+        print('    주의: s%s 후보 %d명 전부 원본 화질 하한 미달 (최고 %.1f)'
+              % (scen['scenario_no'], len(scored), scored[0][0] if scored else 0))
 
     swap = [t for t in ('os', 'od') if b.wants_idrid(
         want[t][0] == 'D' and {'D'} or set(want[t][0].split('|')),

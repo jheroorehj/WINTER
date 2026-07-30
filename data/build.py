@@ -32,7 +32,14 @@ import csv, json, os, shutil, sys, collections
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC_LABELS = os.path.join(ROOT, 'test_dataset_seed42', 'test_labels.csv')
-SRC_IMAGES = os.path.join(ROOT, 'archive', 'preprocessed_images')   # 512x512 전처리본
+SRC_IMAGES = os.path.join(ROOT, 'archive', 'preprocessed_images')   # 512x512 전처리본 (모델 입력)
+# 화면에 보여줄 원본. 임상의는 촬영된 사진을 그대로 봐야 한다 — 크롭·리사이즈된
+# 파생본을 보여주면 "이 도구가 사진을 잘라 버렸다"로 읽힌다.
+# 모델 입력은 SRC_IMAGES 를 계속 쓴다. 원본으로 바꿔도 1단계 검출이 12눈 중 10눈
+# 동일했고 정확도는 4/12 vs 3/12 로 파생본이 오히려 조금 나았다 — 측정으로 확인했다.
+# IDRiD 눈은 원본이 저장소에 없으므로 표시와 모델 입력이 같은 파일이다.
+SRC_RAW = os.path.join(ROOT, 'test_dataset_seed42', 'images')
+OUT_RAW = os.path.join(ROOT, 'data', 'images_raw')
 DR_DIR = os.path.join(ROOT, 'test')                                 # 240x240 IDRiD 테스트 분할 (미전처리)
 OUT_DIR = os.path.join(ROOT, 'data')
 OUT_IMAGES = os.path.join(OUT_DIR, 'images')
@@ -309,14 +316,16 @@ END = '// ==== /GENERATED ===='
 # 프로토타입은 단일 HTML 로 어디서든 열려야 하므로 데이터를 embed 한다.
 # 두 곳에서 갈라지지 않도록 이 스크립트만 그 블록을 쓴다.
 PROTO_FIELDS = ['scenario_no', 'scenario_key', 'scenario_name', 'demo_primary',
-                'patient_id', 'age', 'sex', 'osImage', 'odImage', 'osLabels', 'odLabels',
+                'patient_id', 'age', 'sex', 'osImage', 'odImage',
+                'osDisplay', 'odDisplay', 'osLabels', 'odLabels',
                 'osDrGrade', 'odDrGrade', 'drPattern',
                 'osDataset', 'odDataset', 'osDrGradeSource', 'odDrGradeSource',
                 'osArtifact', 'odArtifact', 'osSourceFile', 'odSourceFile',
                 'displayName', 'chartNo', 'visitDate', 'site', 'weightBmi',
                 'bloodPressure', 'hba1c', 'history', 'correctedVision', 'medication',
                 'vitalNotes', 'patientLine']
-SNAKE = {'osImage': 'os_image', 'odImage': 'od_image', 'osLabels': 'os_labels',
+SNAKE = {'osImage': 'os_image', 'odImage': 'od_image',
+         'osDisplay': 'os_display', 'odDisplay': 'od_display', 'osLabels': 'os_labels',
          'odLabels': 'od_labels', 'osArtifact': 'os_artifact', 'odArtifact': 'od_artifact',
          'osSourceFile': 'os_source_file', 'odSourceFile': 'od_source_file',
          'osDataset': 'os_dataset', 'odDataset': 'od_dataset',
@@ -363,6 +372,7 @@ def main():
     rows = list(csv.DictReader(open(SRC_LABELS, encoding='utf-8-sig')))
     by_id = {r['ID']: r for r in rows}
     os.makedirs(OUT_IMAGES, exist_ok=True)
+    os.makedirs(OUT_RAW, exist_ok=True)
 
     pool = dr_pool()
     if not any(pool.values()):
@@ -444,7 +454,15 @@ def main():
             elif srcp:
                 shutil.copy2(srcp, os.path.join(OUT_IMAGES, img))
 
-            eyes[tag] = dict(image=img, labels='|'.join(sorted(dz)) or 'N',
+            # 화면 표시용 원본. ODIR 눈만 원본이 있고, 없으면 모델 입력과 같은 파일을 본다.
+            disp = ''
+            if dataset == 'ODIR-5K':
+                rawp = os.path.join(SRC_RAW, '%s_%s.jpg' % (src['ID'], side.lower()))
+                if os.path.exists(rawp):
+                    shutil.copy2(rawp, os.path.join(OUT_RAW, img))
+                    disp = img
+
+            eyes[tag] = dict(image=img, display=disp, labels='|'.join(sorted(dz)) or 'N',
                              keywords='; '.join(t['kws']), artifact='; '.join(t['art']),
                              source=source, dataset=dataset,
                              grade=grade or '', grade_source=gsrc)
@@ -464,6 +482,7 @@ def main():
             patient_level_labels='|'.join(k for k in ['N','D','G','C','A','H','M','O']
                                          if int(src[k])),
             os_image=eyes['os']['image'], od_image=eyes['od']['image'],
+            os_display=eyes['os']['display'], od_display=eyes['od']['display'],
             os_labels=eyes['os']['labels'], od_labels=eyes['od']['labels'],
             os_dr_grade=eyes['os']['grade'], od_dr_grade=eyes['od']['grade'],
             dr_pattern=dr_pattern(eyes['os']['grade'], eyes['od']['grade']),

@@ -5,109 +5,75 @@
  "note": "시나리오마다 가장 결과 좋은 변형을 골랐다. live=true 는 심사에서 보여줄 구성으로, 2단계 등급을 맞힌 1건과 중증도가 화면에 끼어들지 않는 4건이다. 고른 케이스는 전체를 대표하지 않으므로 홀드아웃 전체 수치(verify_models.py SUMMARY)를 함께 제시할 것.",
  "pick": {
   "4": {
-   "k": 3,
-   "patient_id": "411",
+   "k": 1,
+   "patient_id": "4307",
    "age": "57",
    "sex": "Male",
    "patient_level_labels": "D",
    "live": true,
-   "score": 110.646,
+   "score": 110.683,
    "stage2_hit": 1,
    "stage2_total": 2,
    "stage1_hit": 1,
    "eyes": {
     "os": {
-     "image": "v4-3-os.jpg",
+     "image": "v4-1-os.jpg",
      "dataset": "IDRiD",
      "labels": "D",
      "grade": 2,
      "grade_source": "idrid_folder",
-     "source_file": "grading_2/IDRiD_017test.jpg",
+     "source_file": "grading_2/IDRiD_033test.jpg",
      "keywords": "moderate non proliferative retinopathy",
      "artifact": ""
     },
     "od": {
-     "image": "v4-3-od.jpg",
+     "image": "v4-1-od.jpg",
      "dataset": "IDRiD",
      "labels": "D",
      "grade": 2,
      "grade_source": "idrid_folder",
-     "source_file": "grading_2/IDRiD_019test.jpg",
+     "source_file": "grading_2/IDRiD_020test.jpg",
      "keywords": "moderate non proliferative retinopathy",
-     "artifact": ""
-    }
-   }
-  },
-  "1": {
-   "k": 4,
-   "patient_id": "3030",
-   "age": "66",
-   "sex": "Male",
-   "patient_level_labels": "N",
-   "live": true,
-   "score": 20,
-   "stage2_hit": 0,
-   "stage2_total": 0,
-   "stage1_hit": 2,
-   "eyes": {
-    "os": {
-     "image": "v1-4-os.jpg",
-     "dataset": "ODIR-5K",
-     "labels": "N",
-     "grade": null,
-     "grade_source": "",
-     "source_file": "3030_left.jpg",
-     "keywords": "normal fundus",
-     "artifact": ""
-    },
-    "od": {
-     "image": "v1-4-od.jpg",
-     "dataset": "ODIR-5K",
-     "labels": "N",
-     "grade": null,
-     "grade_source": "",
-     "source_file": "3030_right.jpg",
-     "keywords": "normal fundus",
      "artifact": ""
     }
    }
   },
   "9": {
-   "k": 0,
+   "k": 2,
    "patient_id": "4593",
    "age": "65",
    "sex": "Male",
    "patient_level_labels": "D",
    "live": false,
-   "score": 20,
-   "stage2_hit": 0,
+   "score": 100.683,
+   "stage2_hit": 1,
    "stage2_total": 2,
-   "stage1_hit": 2,
+   "stage1_hit": 0,
    "eyes": {
     "os": {
-     "image": "v9-0-os.jpg",
+     "image": "v9-2-os.jpg",
      "dataset": "IDRiD",
      "labels": "D",
      "grade": 3,
      "grade_source": "idrid_folder",
-     "source_file": "grading_3/IDRiD_006test.jpg",
+     "source_file": "grading_3/IDRiD_014test.jpg",
      "keywords": "severe nonproliferative retinopathy",
      "artifact": ""
     },
     "od": {
-     "image": "v9-0-od.jpg",
+     "image": "v9-2-od.jpg",
      "dataset": "IDRiD",
      "labels": "D",
      "grade": 2,
      "grade_source": "idrid_folder",
-     "source_file": "grading_2/IDRiD_008test.jpg",
+     "source_file": "grading_2/IDRiD_033test.jpg",
      "keywords": "moderate non proliferative retinopathy",
      "artifact": ""
     }
    }
   },
   "10": {
-   "k": 0,
+   "k": 1,
    "patient_id": "412",
    "age": "60",
    "sex": "Female",
@@ -119,33 +85,33 @@
    "stage1_hit": 2,
    "eyes": {
     "os": {
-     "image": "v10-0-os.jpg",
+     "image": "v10-1-os.jpg",
      "dataset": "IDRiD",
      "labels": "D",
      "grade": 3,
      "grade_source": "idrid_folder",
-     "source_file": "grading_3/IDRiD_006test.jpg",
+     "source_file": "grading_3/IDRiD_089test.jpg",
      "keywords": "severe nonproliferative retinopathy",
      "artifact": ""
     },
     "od": {
-     "image": "v10-0-od.jpg",
+     "image": "v10-1-od.jpg",
      "dataset": "IDRiD",
      "labels": "D",
      "grade": 4,
      "grade_source": "idrid_folder",
-     "source_file": "grading_4/IDRiD_001test.jpg",
+     "source_file": "grading_4/IDRiD_040test.jpg",
      "keywords": "proliferative diabetic retinopathy",
      "artifact": ""
     }
    }
   },
-  "2": {
+  "1": {
    "k": 0,
-   "patient_id": "1417",
-   "age": "83",
+   "patient_id": "2897",
+   "age": "66",
    "sex": "Male",
-   "patient_level_labels": "G",
+   "patient_level_labels": "N",
    "live": true,
    "score": 10,
    "stage2_hit": 0,
@@ -153,23 +119,23 @@
    "stage1_hit": 1,
    "eyes": {
     "os": {
-     "image": "v2-0-os.jpg",
+     "image": "v1-0-os.jpg",
      "dataset": "ODIR-5K",
      "labels": "N",
      "grade": null,
      "grade_source": "",
-     "source_file": "1417_left.jpg",
+     "source_file": "2897_left.jpg",
      "keywords": "normal fundus",
      "artifact": ""
     },
     "od": {
-     "image": "v2-0-od.jpg",
+     "image": "v1-0-od.jpg",
      "dataset": "ODIR-5K",
-     "labels": "G",
+     "labels": "N",
      "grade": null,
      "grade_source": "",
-     "source_file": "1417_right.jpg",
-     "keywords": "suspected glaucoma",
+     "source_file": "2897_right.jpg",
+     "keywords": "normal fundus",
      "artifact": ""
     }
    }
@@ -226,7 +192,7 @@
      "labels": "D",
      "grade": 1,
      "grade_source": "idrid_folder",
-     "source_file": "grading_1/IDRiD_064test.jpg",
+     "source_file": "grading_1/IDRiD_085test.jpg",
      "keywords": "mild nonproliferative retinopathy",
      "artifact": ""
     },
@@ -260,7 +226,7 @@
      "labels": "D",
      "grade": 1,
      "grade_source": "idrid_folder",
-     "source_file": "grading_1/IDRiD_064test.jpg",
+     "source_file": "grading_1/IDRiD_085test.jpg",
      "keywords": "mild nonproliferative retinopathy",
      "artifact": ""
     },
@@ -272,6 +238,40 @@
      "grade_source": "",
      "source_file": "4452_right.jpg",
      "keywords": "normal fundus",
+     "artifact": ""
+    }
+   }
+  },
+  "2": {
+   "k": 0,
+   "patient_id": "1416",
+   "age": "66",
+   "sex": "Female",
+   "patient_level_labels": "G",
+   "live": false,
+   "score": 0,
+   "stage2_hit": 0,
+   "stage2_total": 0,
+   "stage1_hit": 0,
+   "eyes": {
+    "os": {
+     "image": "v2-0-os.jpg",
+     "dataset": "ODIR-5K",
+     "labels": "N",
+     "grade": null,
+     "grade_source": "",
+     "source_file": "1416_left.jpg",
+     "keywords": "normal fundus",
+     "artifact": ""
+    },
+    "od": {
+     "image": "v2-0-od.jpg",
+     "dataset": "ODIR-5K",
+     "labels": "G",
+     "grade": null,
+     "grade_source": "",
+     "source_file": "1416_right.jpg",
+     "keywords": "suspected glaucoma",
      "artifact": ""
     }
    }
@@ -316,7 +316,7 @@
    "age": "65",
    "sex": "Male",
    "patient_level_labels": "H|O",
-   "live": false,
+   "live": true,
    "score": 0,
    "stage2_hit": 0,
    "stage2_total": 0,

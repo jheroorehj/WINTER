@@ -7,118 +7,118 @@
  "neighbors": {
   "s1-os": [
    {
-    "id": "545_right",
-    "sim": 0.8406,
+    "id": "2431_right",
+    "sim": 0.9258,
     "labels": "N",
-    "age": "62",
+    "age": "51",
     "sex": "Female",
     "keywords": "normal fundus",
-    "file": "545_right.jpg"
+    "file": "2431_right.jpg"
    },
    {
-    "id": "439_left",
-    "sim": 0.8295,
+    "id": "2906_left",
+    "sim": 0.9215,
     "labels": "N",
-    "age": "79",
+    "age": "58",
     "sex": "Male",
     "keywords": "normal fundus",
-    "file": "439_left.jpg"
+    "file": "2906_left.jpg"
    },
    {
-    "id": "2778_left",
-    "sim": 0.8153,
+    "id": "443_right",
+    "sim": 0.9112,
     "labels": "N",
-    "age": "56",
-    "sex": "Female",
+    "age": "59",
+    "sex": "Male",
     "keywords": "normal fundus",
-    "file": "2778_left.jpg"
+    "file": "443_right.jpg"
    }
   ],
   "s1-od": [
    {
-    "id": "545_right",
-    "sim": 0.872,
+    "id": "2431_right",
+    "sim": 0.9047,
     "labels": "N",
-    "age": "62",
+    "age": "51",
     "sex": "Female",
     "keywords": "normal fundus",
-    "file": "545_right.jpg"
+    "file": "2431_right.jpg"
    },
    {
-    "id": "2343_left",
-    "sim": 0.865,
+    "id": "4608_left",
+    "sim": 0.8972,
     "labels": "N",
-    "age": "53",
-    "sex": "Male",
+    "age": "50",
+    "sex": "Female",
     "keywords": "normal fundus",
-    "file": "2343_left.jpg"
+    "file": "4608_left.jpg"
    },
    {
-    "id": "2343_right",
-    "sim": 0.8645,
+    "id": "1041_left",
+    "sim": 0.8972,
     "labels": "N",
-    "age": "53",
-    "sex": "Male",
+    "age": "71",
+    "sex": "Female",
     "keywords": "normal fundus",
-    "file": "2343_right.jpg"
+    "file": "1041_left.jpg"
    }
   ],
   "s2-os": [
    {
-    "id": "945_left",
-    "sim": 0.7452,
-    "labels": "N",
-    "age": "44",
+    "id": "873_left",
+    "sim": 0.9013,
+    "labels": "O",
+    "age": "66",
     "sex": "Male",
-    "keywords": "normal fundus",
-    "file": "945_left.jpg"
+    "keywords": "drusen",
+    "file": "873_left.jpg"
    },
    {
-    "id": "58_left",
-    "sim": 0.738,
-    "labels": "N",
-    "age": "74",
-    "sex": "Male",
-    "keywords": "normal fundus",
-    "file": "58_left.jpg"
-   },
-   {
-    "id": "3207_left",
-    "sim": 0.73,
-    "labels": "N",
-    "age": "47",
+    "id": "192_right",
+    "sim": 0.8984,
+    "labels": "O",
+    "age": "66",
     "sex": "Female",
-    "keywords": "normal fundus",
-    "file": "3207_left.jpg"
+    "keywords": "epiretinal membrane",
+    "file": "192_right.jpg"
+   },
+   {
+    "id": "4690_left",
+    "sim": 0.8941,
+    "labels": "D",
+    "age": "57",
+    "sex": "Male",
+    "keywords": "mild nonproliferative retinopathy",
+    "file": "4690_left.jpg"
    }
   ],
   "s2-od": [
    {
-    "id": "1291_right",
-    "sim": 0.5942,
-    "labels": "G|O",
-    "age": "63",
-    "sex": "Male",
-    "keywords": "glaucoma; macular epiretinal membrane",
-    "file": "1291_right.jpg"
-   },
-   {
-    "id": "2375_right",
-    "sim": 0.5847,
+    "id": "3261_left",
+    "sim": 0.8866,
     "labels": "N",
-    "age": "73",
+    "age": "53",
     "sex": "Male",
     "keywords": "normal fundus",
-    "file": "2375_right.jpg"
+    "file": "3261_left.jpg"
    },
    {
-    "id": "1291_left",
-    "sim": 0.5783,
-    "labels": "G|O",
-    "age": "63",
-    "sex": "Male",
-    "keywords": "glaucoma; macular epiretinal membrane",
-    "file": "1291_left.jpg"
+    "id": "2372_right",
+    "sim": 0.8727,
+    "labels": "N",
+    "age": "80",
+    "sex": "Female",
+    "keywords": "normal fundus",
+    "file": "2372_right.jpg"
+   },
+   {
+    "id": "3069_left",
+    "sim": 0.8695,
+    "labels": "N",
+    "age": "65",
+    "sex": "Female",
+    "keywords": "normal fundus",
+    "file": "3069_left.jpg"
    }
   ],
   "s3-os": [
@@ -181,26 +181,26 @@
   ],
   "s4-os": [
    {
-    "id": "479_left",
-    "sim": 0.7036,
+    "id": "744_right",
+    "sim": 0.8115,
     "labels": "D|O",
-    "age": "72",
+    "age": "65",
     "sex": "Female",
-    "keywords": "moderate non proliferative retinopathy; macular epiretinal membrane",
-    "file": "479_left.jpg"
+    "keywords": "epiretinal membrane; moderate non proliferative retinopathy",
+    "file": "744_right.jpg"
    },
    {
-    "id": "32_right",
-    "sim": 0.6699,
-    "labels": "H",
-    "age": "64",
+    "id": "212_left",
+    "sim": 0.7764,
+    "labels": "A|D",
+    "age": "67",
     "sex": "Female",
-    "keywords": "hypertensive retinopathy",
-    "file": "32_right.jpg"
+    "keywords": "dry age-related macular degeneration; diabetic retinopathy",
+    "file": "212_left.jpg"
    },
    {
     "id": "4142_left",
-    "sim": 0.6686,
+    "sim": 0.7734,
     "labels": "D|H",
     "age": "54",
     "sex": "Male",
@@ -210,17 +210,8 @@
   ],
   "s4-od": [
    {
-    "id": "539_left",
-    "sim": 0.8615,
-    "labels": "D|O",
-    "age": "32",
-    "sex": "Male",
-    "keywords": "mild nonproliferative retinopathy; lens dust; drusen",
-    "file": "539_left.jpg"
-   },
-   {
     "id": "4310_right",
-    "sim": 0.8515,
+    "sim": 0.866,
     "labels": "D",
     "age": "56",
     "sex": "Male",
@@ -228,42 +219,51 @@
     "file": "4310_right.jpg"
    },
    {
-    "id": "4425_left",
-    "sim": 0.8508,
-    "labels": "D",
-    "age": "33",
+    "id": "707_left",
+    "sim": 0.8305,
+    "labels": "D|O",
+    "age": "59",
     "sex": "Female",
-    "keywords": "moderate non proliferative retinopathy",
-    "file": "4425_left.jpg"
+    "keywords": "moderate non proliferative retinopathy; myelinated nerve fibers",
+    "file": "707_left.jpg"
+   },
+   {
+    "id": "763_right",
+    "sim": 0.8277,
+    "labels": "D|O",
+    "age": "59",
+    "sex": "Male",
+    "keywords": "moderate non proliferative retinopathy; atrophic change",
+    "file": "763_right.jpg"
    }
   ],
   "s5-os": [
    {
-    "id": "299_left",
-    "sim": 0.8574,
+    "id": "4280_right",
+    "sim": 0.8571,
     "labels": "D",
-    "age": "65",
+    "age": "74",
     "sex": "Female",
-    "keywords": "moderate non proliferative retinopathy",
-    "file": "299_left.jpg"
+    "keywords": "severe nonproliferative retinopathy",
+    "file": "4280_right.jpg"
    },
    {
-    "id": "1290_right",
-    "sim": 0.8475,
-    "labels": "G|H",
-    "age": "54",
+    "id": "4296_right",
+    "sim": 0.8466,
+    "labels": "D",
+    "age": "61",
+    "sex": "Female",
+    "keywords": "moderate non proliferative retinopathy",
+    "file": "4296_right.jpg"
+   },
+   {
+    "id": "411_right",
+    "sim": 0.8382,
+    "labels": "D",
+    "age": "57",
     "sex": "Male",
-    "keywords": "glaucoma; hypertensive retinopathy",
-    "file": "1290_right.jpg"
-   },
-   {
-    "id": "4425_left",
-    "sim": 0.8459,
-    "labels": "D",
-    "age": "33",
-    "sex": "Female",
     "keywords": "moderate non proliferative retinopathy",
-    "file": "4425_left.jpg"
+    "file": "411_right.jpg"
    }
   ],
   "s5-od": [
@@ -413,31 +413,31 @@
   ],
   "s8-os": [
    {
-    "id": "299_left",
-    "sim": 0.8574,
+    "id": "4280_right",
+    "sim": 0.8571,
     "labels": "D",
-    "age": "65",
+    "age": "74",
     "sex": "Female",
-    "keywords": "moderate non proliferative retinopathy",
-    "file": "299_left.jpg"
+    "keywords": "severe nonproliferative retinopathy",
+    "file": "4280_right.jpg"
    },
    {
-    "id": "1290_right",
-    "sim": 0.8475,
-    "labels": "G|H",
-    "age": "54",
+    "id": "4296_right",
+    "sim": 0.8466,
+    "labels": "D",
+    "age": "61",
+    "sex": "Female",
+    "keywords": "moderate non proliferative retinopathy",
+    "file": "4296_right.jpg"
+   },
+   {
+    "id": "411_right",
+    "sim": 0.8382,
+    "labels": "D",
+    "age": "57",
     "sex": "Male",
-    "keywords": "glaucoma; hypertensive retinopathy",
-    "file": "1290_right.jpg"
-   },
-   {
-    "id": "4425_left",
-    "sim": 0.8459,
-    "labels": "D",
-    "age": "33",
-    "sex": "Female",
     "keywords": "moderate non proliferative retinopathy",
-    "file": "4425_left.jpg"
+    "file": "411_right.jpg"
    }
   ],
   "s8-od": [
@@ -471,95 +471,95 @@
   ],
   "s9-os": [
    {
-    "id": "26_right",
-    "sim": 0.8264,
+    "id": "744_right",
+    "sim": 0.7466,
     "labels": "D|O",
-    "age": "63",
+    "age": "65",
     "sex": "Female",
-    "keywords": "moderate non proliferative retinopathy; abnormal pigment",
-    "file": "26_right.jpg"
+    "keywords": "epiretinal membrane; moderate non proliferative retinopathy",
+    "file": "744_right.jpg"
    },
    {
-    "id": "914_left",
-    "sim": 0.7879,
-    "labels": "D|O",
-    "age": "61",
-    "sex": "Female",
-    "keywords": "moderate non proliferative retinopathy; myelinated nerve fibers; laser spot",
-    "file": "914_left.jpg"
+    "id": "4142_right",
+    "sim": 0.7194,
+    "labels": "D|H",
+    "age": "54",
+    "sex": "Male",
+    "keywords": "severe nonproliferative retinopathy; hypertensive retinopathy",
+    "file": "4142_right.jpg"
    },
    {
-    "id": "4280_right",
-    "sim": 0.7846,
-    "labels": "D",
-    "age": "74",
-    "sex": "Female",
-    "keywords": "severe nonproliferative retinopathy",
-    "file": "4280_right.jpg"
+    "id": "1132_right",
+    "sim": 0.7069,
+    "labels": "O",
+    "age": "56",
+    "sex": "Male",
+    "keywords": "vitreous degeneration",
+    "file": "1132_right.jpg"
    }
   ],
   "s9-od": [
    {
-    "id": "1496_right",
-    "sim": 0.848,
-    "labels": "D|G",
-    "age": "31",
+    "id": "744_right",
+    "sim": 0.8115,
+    "labels": "D|O",
+    "age": "65",
     "sex": "Female",
-    "keywords": "moderate non proliferative retinopathy; glaucoma",
-    "file": "1496_right.jpg"
+    "keywords": "epiretinal membrane; moderate non proliferative retinopathy",
+    "file": "744_right.jpg"
    },
    {
-    "id": "1290_right",
-    "sim": 0.8231,
-    "labels": "G|H",
+    "id": "212_left",
+    "sim": 0.7764,
+    "labels": "A|D",
+    "age": "67",
+    "sex": "Female",
+    "keywords": "dry age-related macular degeneration; diabetic retinopathy",
+    "file": "212_left.jpg"
+   },
+   {
+    "id": "4142_left",
+    "sim": 0.7734,
+    "labels": "D|H",
     "age": "54",
     "sex": "Male",
-    "keywords": "glaucoma; hypertensive retinopathy",
-    "file": "1290_right.jpg"
-   },
-   {
-    "id": "796_left",
-    "sim": 0.8023,
-    "labels": "D",
-    "age": "64",
-    "sex": "Male",
-    "keywords": "moderate non proliferative retinopathy",
-    "file": "796_left.jpg"
+    "keywords": "severe nonproliferative retinopathy; hypertensive retinopathy",
+    "file": "4142_left.jpg"
    }
   ],
   "s10-os": [
    {
-    "id": "26_right",
-    "sim": 0.8264,
-    "labels": "D|O",
-    "age": "63",
-    "sex": "Female",
-    "keywords": "moderate non proliferative retinopathy; abnormal pigment",
-    "file": "26_right.jpg"
-   },
-   {
-    "id": "914_left",
-    "sim": 0.7879,
-    "labels": "D|O",
-    "age": "61",
-    "sex": "Female",
-    "keywords": "moderate non proliferative retinopathy; myelinated nerve fibers; laser spot",
-    "file": "914_left.jpg"
-   },
-   {
-    "id": "4280_right",
-    "sim": 0.7846,
+    "id": "4310_right",
+    "sim": 0.8829,
     "labels": "D",
-    "age": "74",
-    "sex": "Female",
+    "age": "56",
+    "sex": "Male",
     "keywords": "severe nonproliferative retinopathy",
-    "file": "4280_right.jpg"
+    "file": "4310_right.jpg"
+   },
+   {
+    "id": "4234_left",
+    "sim": 0.8721,
+    "labels": "D",
+    "age": "43",
+    "sex": "Male",
+    "keywords": "moderate non proliferative retinopathy",
+    "file": "4234_left.jpg"
+   },
+   {
+    "id": "763_right",
+    "sim": 0.8716,
+    "labels": "D|O",
+    "age": "59",
+    "sex": "Male",
+    "keywords": "moderate non proliferative retinopathy; atrophic change",
+    "file": "763_right.jpg"
    }
   ],
   "s10-od": [
    {
     "id": "4280_right",
-    "sim": 0.7653,
+    "sim": 0.8918,
     "labels": "D",
     "age": "74",
     "sex": "Female",
@@ -567,22 +567,22 @@
     "file": "4280_right.jpg"
    },
    {
-    "id": "707_left",
-    "sim": 0.7523,
+    "id": "914_left",
+    "sim": 0.8686,
     "labels": "D|O",
-    "age": "59",
+    "age": "61",
     "sex": "Female",
-    "keywords": "moderate non proliferative retinopathy; myelinated nerve fibers",
-    "file": "707_left.jpg"
+    "keywords": "moderate non proliferative retinopathy; myelinated nerve fibers; laser spot",
+    "file": "914_left.jpg"
    },
    {
-    "id": "1095_left",
-    "sim": 0.7407,
-    "labels": "O",
-    "age": "56",
-    "sex": "Male",
-    "keywords": "branch retinal vein occlusion",
-    "file": "1095_left.jpg"
+    "id": "4280_left",
+    "sim": 0.8536,
+    "labels": "D",
+    "age": "74",
+    "sex": "Female",
+    "keywords": "severe nonproliferative retinopathy",
+    "file": "4280_left.jpg"
    }
   ]
  }

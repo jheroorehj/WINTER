@@ -120,6 +120,7 @@
           <span class="tag" style="border: 1px solid var(--color-accent); color: var(--color-accent-300);">OS</span>
           <span class="num" style="font-size: 11px; color: var(--color-neutral-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ p.os.file }}</span>
           <span style="font-size: 11px; color: var(--color-neutral-400); white-space: nowrap;">화질 {{ p.os.quality }}</span>
+          <span style="font-size: 11px; color: var(--color-neutral-500); white-space: nowrap;">표시 {{ p.os.shown }} · 모델 입력 224 전처리</span>
           <span class="num" style="font-size: 11px; color: var(--color-neutral-500); white-space: nowrap;">이웃 라벨 일치 {{ agreeOS }}</span>
         </div>
         <div style="display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;">
@@ -164,6 +165,7 @@
           <span class="tag" style="border: 1px solid var(--color-accent); color: var(--color-accent-300);">OD</span>
           <span class="num" style="font-size: 11px; color: var(--color-neutral-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ p.od.file }}</span>
           <span style="font-size: 11px; color: var(--color-neutral-400); white-space: nowrap;">화질 {{ p.od.quality }}</span>
+          <span style="font-size: 11px; color: var(--color-neutral-500); white-space: nowrap;">표시 {{ p.od.shown }} · 모델 입력 224 전처리</span>
           <span class="num" style="font-size: 11px; color: var(--color-neutral-500); white-space: nowrap;">이웃 라벨 일치 {{ agreeOD }}</span>
         </div>
         <div style="display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;">
@@ -493,8 +495,25 @@ function fitScale() {
   return Math.max(MIN_SCALE, w / CANVAS_W);
 }
 
-// 환자 자신의 안저 영상. 시나리오 데이터와 같은 출처를 쓴다.
+// 모델 입력용 영상. 1단계 전처리(preproc.js)가 이 파일을 읽는다.
 const IMG = '../../data/images/';
+
+// 화면 표시용 원본. 임상의는 촬영된 사진을 그대로 봐야 한다 — 크롭·리사이즈된
+// 파생본을 보여주면 "이 도구가 사진을 잘라 버렸다"로 읽힌다.
+//
+// 표시와 모델 입력을 분리한 것은 의도적이다. 모델은 224 전처리 텐서를 받아야 하고
+// 사람은 원본을 봐야 하므로 둘이 같은 파일일 이유가 없다. 같은 눈의 같은 촬영이며
+// 해상도 단계만 다르다. 모델 입력을 원본으로 바꿔도 1단계 검출이 12눈 중 10눈
+// 동일했으므로(측정), 표시만 바꾸는 것이 안전하다.
+//
+// IDRiD 눈은 원본이 저장소에 없어 표시와 모델 입력이 같은 파일이다.
+const IMG_RAW = '../../data/images_raw/';
+
+// 표시할 파일을 고른다. 원본이 있으면 원본, 없으면 모델 입력과 같은 파일.
+function displayImg(sc, eye) {
+  const raw = sc[eye + 'Display'];
+  return raw ? IMG_RAW + raw : IMG + sc[eye + 'Image'];
+}
 // 유사 학습 사례 영상. data/build_neighbors.py 가 kNN 결과에 등장한 55장만
 // 골라 복사해 둔 것이다 — 후보 828장 전부는 51MB 라 저장소에 넣지 않는다.
 const NEIGHBOR_IMG = '../../data/neighbors/';
@@ -609,11 +628,11 @@ function drGradeName(g) {
 // 실제 데이터는 age/sex/영상/라벨뿐이며 임상정보와 환자명은 생성값이다
 // — clinical_fields_synthetic 열 참고.
 const SCENARIOS = [
-  { scenario_no: 1, scenario_key: "both_normal", scenario_name: "양안 정상", demo_primary: 1, patient_id: "3030", age: "66", sex: "Male", osImage: "s1-os.jpg", odImage: "s1-od.jpg", osLabels: "N", odLabels: "N", osDrGrade: "", odDrGrade: "", drPattern: "none", osDataset: "ODIR-5K", odDataset: "ODIR-5K", osDrGradeSource: "", odDrGradeSource: "", osArtifact: "", odArtifact: "", osSourceFile: "3030_left.jpg", odSourceFile: "3030_right.jpg", displayName: "한지영", chartNo: "DEMO-3030", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "58 kg · 22.5", bloodPressure: "118 / 74", hba1c: "5.4 %", history: "없음", correctedVision: "OS 0.9 / OD 1.0", medication: "없음", vitalNotes: "", patientLine: "양쪽 눈 모두 이번 사진에서는 특별한 변화가 보이지 않습니다. 정기 검진 주기를 지켜주시면 됩니다." },
-  { scenario_no: 2, scenario_key: "unilateral_single", scenario_name: "단안 단일 소견", demo_primary: 1, patient_id: "1417", age: "83", sex: "Male", osImage: "s2-os.jpg", odImage: "s2-od.jpg", osLabels: "N", odLabels: "G", osDrGrade: "", odDrGrade: "", drPattern: "none", osDataset: "ODIR-5K", odDataset: "ODIR-5K", osDrGradeSource: "", odDrGradeSource: "", osArtifact: "", odArtifact: "", osSourceFile: "1417_left.jpg", odSourceFile: "1417_right.jpg", displayName: "최병호", chartNo: "DEMO-1417", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "63 kg · 23.1", bloodPressure: "134 / 80", hba1c: "5.8 %", history: "녹내장 (형)", correctedVision: "OS 0.8 / OD 0.5", medication: "없음", vitalNotes: "hist=가족력 고위험|vision=우안 저하", patientLine: "오른쪽 눈 시신경 모양이 녹내장 초기와 비슷합니다. 녹내장은 증상 없이 진행되므로 안과에서 안압과 시야검사를 받아보시길 권합니다." },
-  { scenario_no: 3, scenario_key: "unilateral_multi", scenario_name: "단안 복수 소견", demo_primary: 1, patient_id: "4330", age: "57", sex: "Female", osImage: "s3-os.jpg", odImage: "s3-od.jpg", osLabels: "N", odLabels: "A|D", osDrGrade: "", odDrGrade: 1, drPattern: "unilateral", osDataset: "ODIR-5K", odDataset: "ODIR-5K", osDrGradeSource: "", odDrGradeSource: "odir_keyword", osArtifact: "", odArtifact: "", osSourceFile: "4330_left.jpg", odSourceFile: "4330_right.jpg", displayName: "윤미경", chartNo: "DEMO-4330", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "60 kg · 24.2", bloodPressure: "138 / 86", hba1c: "8.4 %", history: "T2DM 9년", correctedVision: "OS 0.9 / OD 0.4", medication: "Metformin", vitalNotes: "hba1c=조절 미흡|vision=우안 왜곡 호소", patientLine: "오른쪽 눈에 두 가지 변화가 함께 보입니다. 당뇨로 인한 혈관 변화와 중심부(황반) 노화 변화입니다. 두 가지 모두 안과에서 확인이 필요합니다." },
-  { scenario_no: 4, scenario_key: "bilateral_same", scenario_name: "양안 동일 소견", demo_primary: 1, patient_id: "411", age: "57", sex: "Male", osImage: "s4-os.jpg", odImage: "s4-od.jpg", osLabels: "D", odLabels: "D", osDrGrade: 2, odDrGrade: 2, drPattern: "bilateral_same_grade", osDataset: "IDRiD", odDataset: "IDRiD", osDrGradeSource: "idrid_folder", odDrGradeSource: "idrid_folder", osArtifact: "", odArtifact: "", osSourceFile: "grading_2/IDRiD_017test.jpg", odSourceFile: "grading_2/IDRiD_019test.jpg", displayName: "임재식", chartNo: "DEMO-411", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "79 kg · 26.8", bloodPressure: "142 / 88", hba1c: "9.6 %", history: "T2DM 14년", correctedVision: "OS 0.6 / OD 0.7", medication: "Metformin, Glimepiride", vitalNotes: "hba1c=장기 미조절|bp=고혈압 범위", patientLine: "양쪽 눈 혈관에 당뇨로 인한 변화가 같은 정도로 보입니다. 눈만의 문제가 아니라 전신 혈관 상태를 함께 봐야 합니다. 혈당 조절이 가장 중요한 치료입니다." },
-  { scenario_no: 5, scenario_key: "bilateral_diff", scenario_name: "양안 서로 다른 소견", demo_primary: 1, patient_id: "4215", age: "66", sex: "Male", osImage: "s5-os.jpg", odImage: "s5-od.jpg", osLabels: "D", odLabels: "H", osDrGrade: 1, odDrGrade: "", drPattern: "unilateral", osDataset: "IDRiD", odDataset: "ODIR-5K", osDrGradeSource: "idrid_folder", odDrGradeSource: "", osArtifact: "", odArtifact: "", osSourceFile: "grading_1/IDRiD_064test.jpg", odSourceFile: "4215_right.jpg", displayName: "강동수", chartNo: "DEMO-4215", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "74 kg · 25.4", bloodPressure: "156 / 94", hba1c: "7.9 %", history: "T2DM 6년, HTN", correctedVision: "OS 0.5 / OD 0.7", medication: "Metformin, Amlodipine", vitalNotes: "bp=고혈압 2기|hba1c=조절 미흡", patientLine: "두 눈에 서로 다른 변화가 있습니다. 왼쪽은 당뇨로 인한 변화, 오른쪽은 혈압으로 인한 변화입니다. 혈당과 혈압을 함께 관리해야 합니다." }
+  { scenario_no: 1, scenario_key: "both_normal", scenario_name: "양안 정상", demo_primary: 1, patient_id: "2897", age: "66", sex: "Male", osImage: "s1-os.jpg", odImage: "s1-od.jpg", osDisplay: "s1-os.jpg", odDisplay: "s1-od.jpg", osLabels: "N", odLabels: "N", osDrGrade: "", odDrGrade: "", drPattern: "none", osDataset: "ODIR-5K", odDataset: "ODIR-5K", osDrGradeSource: "", odDrGradeSource: "", osArtifact: "", odArtifact: "", osSourceFile: "2897_left.jpg", odSourceFile: "2897_right.jpg", displayName: "한지영", chartNo: "DEMO-2897", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "58 kg · 22.5", bloodPressure: "118 / 74", hba1c: "5.4 %", history: "없음", correctedVision: "OS 0.9 / OD 1.0", medication: "없음", vitalNotes: "", patientLine: "양쪽 눈 모두 이번 사진에서는 특별한 변화가 보이지 않습니다. 정기 검진 주기를 지켜주시면 됩니다." },
+  { scenario_no: 3, scenario_key: "unilateral_multi", scenario_name: "단안 복수 소견", demo_primary: 1, patient_id: "4330", age: "57", sex: "Female", osImage: "s3-os.jpg", odImage: "s3-od.jpg", osDisplay: "s3-os.jpg", odDisplay: "s3-od.jpg", osLabels: "N", odLabels: "A|D", osDrGrade: "", odDrGrade: 1, drPattern: "unilateral", osDataset: "ODIR-5K", odDataset: "ODIR-5K", osDrGradeSource: "", odDrGradeSource: "odir_keyword", osArtifact: "", odArtifact: "", osSourceFile: "4330_left.jpg", odSourceFile: "4330_right.jpg", displayName: "윤미경", chartNo: "DEMO-4330", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "60 kg · 24.2", bloodPressure: "138 / 86", hba1c: "8.4 %", history: "T2DM 9년", correctedVision: "OS 0.9 / OD 0.4", medication: "Metformin", vitalNotes: "hba1c=조절 미흡|vision=우안 왜곡 호소", patientLine: "오른쪽 눈에 두 가지 변화가 함께 보입니다. 당뇨로 인한 혈관 변화와 중심부(황반) 노화 변화입니다. 두 가지 모두 안과에서 확인이 필요합니다." },
+  { scenario_no: 4, scenario_key: "bilateral_same", scenario_name: "양안 동일 소견", demo_primary: 1, patient_id: "4307", age: "57", sex: "Male", osImage: "s4-os.jpg", odImage: "s4-od.jpg", osDisplay: "", odDisplay: "", osLabels: "D", odLabels: "D", osDrGrade: 2, odDrGrade: 2, drPattern: "bilateral_same_grade", osDataset: "IDRiD", odDataset: "IDRiD", osDrGradeSource: "idrid_folder", odDrGradeSource: "idrid_folder", osArtifact: "", odArtifact: "", osSourceFile: "grading_2/IDRiD_033test.jpg", odSourceFile: "grading_2/IDRiD_020test.jpg", displayName: "임재식", chartNo: "DEMO-4307", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "79 kg · 26.8", bloodPressure: "142 / 88", hba1c: "9.6 %", history: "T2DM 14년", correctedVision: "OS 0.6 / OD 0.7", medication: "Metformin, Glimepiride", vitalNotes: "hba1c=장기 미조절|bp=고혈압 범위", patientLine: "양쪽 눈 혈관에 당뇨로 인한 변화가 같은 정도로 보입니다. 눈만의 문제가 아니라 전신 혈관 상태를 함께 봐야 합니다. 혈당 조절이 가장 중요한 치료입니다." },
+  { scenario_no: 5, scenario_key: "bilateral_diff", scenario_name: "양안 서로 다른 소견", demo_primary: 1, patient_id: "4215", age: "66", sex: "Male", osImage: "s5-os.jpg", odImage: "s5-od.jpg", osDisplay: "", odDisplay: "s5-od.jpg", osLabels: "D", odLabels: "H", osDrGrade: 1, odDrGrade: "", drPattern: "unilateral", osDataset: "IDRiD", odDataset: "ODIR-5K", osDrGradeSource: "idrid_folder", odDrGradeSource: "", osArtifact: "", odArtifact: "", osSourceFile: "grading_1/IDRiD_085test.jpg", odSourceFile: "4215_right.jpg", displayName: "강동수", chartNo: "DEMO-4215", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "74 kg · 25.4", bloodPressure: "156 / 94", hba1c: "7.9 %", history: "T2DM 6년, HTN", correctedVision: "OS 0.5 / OD 0.7", medication: "Metformin, Amlodipine", vitalNotes: "bp=고혈압 2기|hba1c=조절 미흡", patientLine: "두 눈에 서로 다른 변화가 있습니다. 왼쪽은 당뇨로 인한 변화, 오른쪽은 혈압으로 인한 변화입니다. 혈당과 혈압을 함께 관리해야 합니다." },
+  { scenario_no: 7, scenario_key: "bilateral_overlap", scenario_name: "양안 일부 겹침 (비대칭 진행)", demo_primary: 1, patient_id: "323", age: "65", sex: "Male", osImage: "s7-os.jpg", odImage: "s7-od.jpg", osDisplay: "s7-os.jpg", odDisplay: "s7-od.jpg", osLabels: "H|O", odLabels: "H", osDrGrade: "", odDrGrade: "", drPattern: "none", osDataset: "ODIR-5K", odDataset: "ODIR-5K", osDrGradeSource: "", odDrGradeSource: "", osArtifact: "", odArtifact: "", osSourceFile: "323_left.jpg", odSourceFile: "323_right.jpg", displayName: "노경환", chartNo: "DEMO-323", visitDate: "2026-07-29", site: "○○보건소 3차 순회 · 안저카메라 A", weightBmi: "68 kg · 24.1", bloodPressure: "152 / 92", hba1c: "6.1 %", history: "HTN 8년", correctedVision: "OS 0.6 / OD 0.8", medication: "Losartan", vitalNotes: "bp=고혈압 2기|vision=좌안 저하", patientLine: "양쪽 눈 혈관에 혈압으로 인한 변화가 있고, 왼쪽 눈에는 추가 변화가 한 가지 더 보입니다. 혈압 관리와 함께 왼쪽 눈을 우선 확인해야 합니다." }
 ];
 // ==== /GENERATED ====
 
@@ -1155,9 +1174,11 @@ function buildPatient(sc, preds) {
     chartNo: sc.chartNo, visit: sc.visitDate, site: sc.site,
     vitals: vitals(sc),
     os: { file: sc.osSourceFile, quality: sc.osArtifact ? '보통 · ' + sc.osArtifact : '양호',
-          preds: osPreds, dr: osDr, img: IMG + sc.osImage },
+          preds: osPreds, dr: osDr, img: displayImg(sc, 'os'),
+          shown: sc.osDisplay ? '원본' : '데이터셋 전처리본' },
     od: { file: sc.odSourceFile, quality: sc.odArtifact ? '보통 · ' + sc.odArtifact : '양호',
-          preds: odPreds, dr: odDr, img: IMG + sc.odImage },
+          preds: odPreds, dr: odDr, img: displayImg(sc, 'od'),
+          shown: sc.odDisplay ? '원본' : '데이터셋 전처리본' },
     simOS: neighbors(sc, 'os', osPreds), simOD: neighbors(sc, 'od', odPreds),
     referrals: cl.referrals, tests: cl.tests, systemic: cl.systemic, notes: cl.notes,
     patientLine: sc.patientLine
