@@ -18,6 +18,7 @@
 """
 import argparse
 import csv
+import datetime
 import glob
 import json
 import os
@@ -31,6 +32,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, 'data')
 PAGE = os.path.join(DATA, 'verify_models.html')
 LIST = os.path.join(DATA, '_verify_list.json')
+STATUS = os.path.join(DATA, 'model_status.json')
 DR_DIR = os.path.join(ROOT, 'Diabetic retinopathy')
 
 # 화면이 쓰는 것과 같은 주소여야 한다. 프로토타입의 MODEL_URL / DR_MODEL_BASE 와 맞춰 둔다.
@@ -61,6 +63,7 @@ def build_items(n_idrid):
             for tag in ('os', 'od'):
                 g = r[tag + '_dr_grade']
                 items.append({
+                    'key': '%s|%s' % (r['scenario_no'], tag),
                     'id': 's%s-%s (%s)' % (r['scenario_no'], tag, r[tag + '_dataset']),
                     'url': '../data/images/' + r[tag + '_image'],
                     'labels': r[tag + '_labels'],
@@ -106,11 +109,92 @@ def main():
     if not m:
         sys.exit('브라우저 출력을 읽지 못했습니다. data/verify_models.html 을 직접 열어 보세요.')
     body = m.group(1)
-    print(body.strip())
+    results = None
+    shown = []
+    for line in body.splitlines():
+        if line.startswith('JSON '):
+            results = json.loads(line[5:].replace('&quot;', '"').replace('&amp;', '&'))
+        else:
+            shown.append(line)
+    print('\n'.join(shown).strip())
     if 'ERROR ' in body:
         sys.exit(1)
     if 'DONE' not in body:
         sys.exit('검증이 끝나지 않았습니다 (타임아웃 또는 로드 실패).')
+    if results:
+        write_status(results, args)
+
+
+def badge(eyes):
+    """시나리오 하나의 상태 배지. 정답을 지우지 않고, 현재 모델이 그걸 재현하는지만 적는다.
+
+    배지는 손으로 쓰지 않는다 — 재학습하면 손으로 쓴 배지는 즉시 거짓이 된다.
+    이 함수가 측정 결과에서 만들고, verify_models.py 를 다시 돌리면 갱신된다.
+    """
+    tags = []
+
+    # 1단계: 정답 라벨셋과 검출 라벨셋 비교
+    def norm(x):
+        return '|'.join(sorted(t for t in (x or '').split('|') if t and t != 'N'))
+    mism = [e for e in eyes if norm(e['truthLabels']) != norm(e['detected'])]
+    if not mism:
+        tags.append('1단계 일치')
+    else:
+        # D 오탐(정답에 D 가 없는데 검출됨)이 가장 흔하고 시연에서 눈에 띈다
+        fp_d = [e for e in mism if 'D' in norm(e['detected']) and 'D' not in norm(e['truthLabels'])]
+        miss = [e for e in mism if set(norm(e['truthLabels']).split('|')) - set(norm(e['detected']).split('|'))]
+        if fp_d:
+            tags.append('1단계 D 오탐')
+        elif miss:
+            tags.append('1단계 미검출')
+        else:
+            tags.append('1단계 불일치')
+
+    # 2단계: 정답 등급이 있는 눈만 본다
+    graded = [e for e in eyes if e['truthGrade']]
+    if graded:
+        ran = [e for e in graded if e['gated'] and e['topGrade'] is not None]
+        if not ran:
+            tags.append('2단계 미실행')
+        else:
+            hit = [e for e in ran if e['topGrade'] == e['truthGrade']]
+            nodr = [e for e in ran if e['topGrade'] == 0]
+            if len(hit) == len(graded):
+                tags.append('2단계 일치')
+            elif hit:
+                tags.append('2단계 부분일치')
+            elif nodr:
+                tags.append('2단계 불일치')
+            else:
+                tags.append('2단계 등급 상이')
+    return tags
+
+
+def write_status(results, args):
+    by_scen = {}
+    for r in results:
+        if not r.get('key'):
+            continue
+        no, tag = r['key'].split('|')
+        by_scen.setdefault(no, {})[tag] = r
+    out = {}
+    for no, eyes in by_scen.items():
+        vals = [eyes[t] for t in ('os', 'od') if t in eyes]
+        tags = badge(vals)
+        out[no] = {'tags': tags, 'badge': ' · '.join(tags),
+                   'eyes': {t: eyes[t] for t in eyes}}
+    json.dump({
+        'measuredAt': datetime.datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'stage1Url': args.stage1, 'stage2Base': args.stage2,
+        'note': ('현재 모델이 시나리오 정답을 재현하는지의 측정 결과다. 시나리오 이름은 '
+                 '정답을 그대로 두고 이 배지로 상태를 표시한다 — 정답은 모델이 틀려도 '
+                 '사실이고 정확도 평가에 필요하다. 모델을 재학습하면 '
+                 'python3 data/verify_models.py 를 다시 돌려 갱신할 것.'),
+        'scenarios': out,
+    }, open(STATUS, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+    print('\nmodel_status.json — 시나리오 %d건 배지 갱신' % len(out))
+    for no in sorted(out, key=int):
+        print('  s%-3s %s' % (no, out[no]['badge']))
 
 
 if __name__ == '__main__':

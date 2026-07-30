@@ -371,6 +371,9 @@
           <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; text-align: left;">
             <span style="font-size: 14px; color: var(--color-neutral-100); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ t.scenario }}</span>
             <span class="num" style="font-size: 11px; color: var(--color-neutral-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ t.patient }}</span>
+            <!-- 정답 이름은 그대로 두고, 현재 모델이 재현하는지를 배지로 적는다.
+                 data/verify_models.py 가 측정해 쓴 값이며 손으로 쓰지 않는다. -->
+            <span class="num" style="font-size: 10px; color: var(--c-warn); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ t.status }}</span>
           </span>
           <span class="num" style="flex-shrink: 0; font-size: 11px; color: var(--color-neutral-400); text-align: right;">{{ t.labels }}</span>
         </button>
@@ -497,6 +500,12 @@ const IMG = '../../data/images/';
 const NEIGHBOR_IMG = '../../data/neighbors/';
 const NEIGHBORS_URL = '../../data/neighbors.json';
 
+// 시나리오 이름은 정답을 그대로 두고, 현재 모델이 그걸 재현하는지는 이 배지로 표시한다.
+// 배지를 손으로 쓰지 않는 이유는 재학습하면 즉시 거짓이 되기 때문이다 —
+// python3 data/verify_models.py 가 측정해서 쓴다.
+const MODEL_STATUS_URL = '../../data/model_status.json';
+let MODEL_STATUS = null;
+
 // ── 모델 계약 ────────────────────────────────────────────────────────────
 // 출력은 이 순서의 길이 6 확률 벡터다. 학습 시 클래스 순서를 여기와 반드시 맞춘다.
 const LABEL_ORDER = ['N', 'D', 'G', 'A', 'H', 'O'];
@@ -579,6 +588,18 @@ let DR_GATE = 0.5;
 // "1단계가 D 로 의심한 경우의 추정"이라는 조건부다.
 const DR_CONDITIONAL_ONLY = true;
 const DR_NO_DR_GRADE = 0;
+
+// 등급 표기는 데이터셋 폴더명(grading_1~grading_4)과 TM 클래스명에 맞춘다. 화면과
+// 폴더와 모델이 같은 이름을 쓰면 "3등급" 이 어느 폴더의 무엇인지 되짚을 필요가 없다.
+// grade0 은 폴더가 없으므로 grading_0 이라고 부르지 않는다 — 없는 병기를 만들지 않는다.
+function drGradeTag(g) {
+  return g === DR_NO_DR_GRADE ? 'DR 없음' : 'grading_' + g;
+}
+function drGradeName(g) {
+  return g === DR_NO_DR_GRADE
+    ? (DR_LABELS[g] || 'DR 없음')
+    : drGradeTag(g) + ' · ' + (DR_LABELS[g] || '');
+}
 
 // ==== GENERATED — 수정하지 마세요. `python3 data/build.py` 가 이 블록을 덮어씁니다. ====
 // 출처: data/scenarios.csv (10건). 실제 데이터는 age/sex/영상/라벨뿐이며
@@ -735,12 +756,14 @@ const MODEL = {
     // Promise.all 안에 넣는 이유는 렌더 시점 경쟁을 없애기 위해서다. 밖에서 따로
     // 받으면 첫 렌더가 NEIGHBORS=null 로 지나가고, 도착해도 다시 그리지 않는다.
     const nb = fetch(NEIGHBORS_URL).then(r => r.ok ? r.json() : null).catch(() => null);
+    const st = fetch(MODEL_STATUS_URL).then(r => r.ok ? r.json() : null).catch(() => null);
     return Promise.all([
       j('preprocessing'), j('postprocessing'), j('color_reference'),
-      ort.InferenceSession.create(MODEL_URL, { executionProviders: ['wasm'] }), nb
+      ort.InferenceSession.create(MODEL_URL, { executionProviders: ['wasm'] }), nb, st
     ]).then(r => {
       const pre = r[0], post = r[1], ref = r[2], net = r[3];
       NEIGHBORS = r[4];
+      MODEL_STATUS = r[5];
       // 라벨 순서가 화면 계약과 다르면 즉시 멈춘다. 어긋난 채로 돌면 소견 이름이
       // 뒤바뀐 화면이 나오고, 그건 오류보다 위험하다.
       if (post.labels.join(',') !== LABEL_ORDER.join(',')) {
@@ -1012,8 +1035,8 @@ function clinical(sc, osPreds, odPreds, osDr, odDr) {
     if (code !== 'D' || !dr[eye]) return head;
     const g = dr[eye];
     if (g.noDr) return head + ' · 2단계는 DR 없음 (1단계와 불일치)';
-    return head + ' · ' + g.grade + '등급'
-      + (g.close ? ' (' + g.second + '등급과 근접 → ' + g.action + '등급 기준)' : '');
+    return head + ' · ' + drGradeTag(g.grade)
+      + (g.close ? ' (' + drGradeTag(g.second) + ' 근접 → ' + drGradeTag(g.action) + ' 기준)' : '');
   }).filter(Boolean).join('   ');
 
   // D 의 시급도·사유는 등급에서 나온다. 두 눈의 등급이 다르면 더 심한 쪽을 따른다 —
@@ -1108,8 +1131,10 @@ function clinical(sc, osPreds, odPreds, osDr, odDr) {
   // (3) 양안 DR 등급 비대칭 — 더 심한 쪽으로 대응하지만 반대쪽이 안전한 것은 아니다.
   if (found.D && dr.os && dr.od && !dr.os.noDr && !dr.od.noDr && dr.os.grade !== dr.od.grade) {
     notes.push({
-      title: '양안 DR 등급이 다릅니다 — 좌안 ' + dr.os.grade + '등급 · 우안 ' + dr.od.grade + '등급',
-      body: '시급도는 더 심한 ' + Math.max(dr.os.action, dr.od.action) + '등급 기준으로 정했습니다. '
+      title: '양안 DR 등급이 다릅니다 — 좌안 ' + drGradeTag(dr.os.grade)
+             + ' · 우안 ' + drGradeTag(dr.od.grade),
+      body: '시급도는 더 심한 ' + drGradeTag(Math.max(dr.os.action, dr.od.action))
+        + ' 기준으로 정했습니다. '
         + '반대쪽 눈이 안전하다는 뜻이 아닙니다 — 등급이 낮은 눈도 같은 전신 위험을 공유하며 '
         + '진행 속도가 다를 수 있으므로 두 눈을 각각 추적하세요.'
     });
@@ -1141,6 +1166,12 @@ function buildPatient(sc, preds) {
 }
 
 const EYE = { os: { label: '좌안 (OS)', code: 'OS' }, od: { label: '우안 (OD)', code: 'OD' } };
+
+// 측정 파일이 없거나 아직 안 왔으면 빈 문자열 — 배지 자리만 비고 이름은 그대로 보인다.
+function statusBadge(no) {
+  const sc = MODEL_STATUS && MODEL_STATUS.scenarios && MODEL_STATUS.scenarios[String(no)];
+  return sc ? sc.badge : '';
+}
 
 class Component extends DCLogic {
   state = {
@@ -1272,18 +1303,19 @@ class Component extends DCLogic {
         drText: !isD ? '' : (dr
           ? (dr.noDr
               ? 'DR 없음 ' + pct(dr.p) + ' — 1단계와 불일치'
-              : dr.grade + '등급 · ' + (DR_LABELS[dr.grade] || '') + '  ' + pct(dr.p))
+              : drGradeName(dr.grade) + '  ' + pct(dr.p))
           : (gated ? '중증도 미판정 — 2단계 모델 로드 실패' : '중증도 미측정')),
         drNote: !isD ? '' : (dr
           ? (dr.noDr
               ? '2단계가 당뇨망막병증을 부정했습니다. 두 모델이 반대로 말하므로 어느 쪽도 '
-                + '확정이 아니며, 병기를 붙이지 않았습니다. 2위는 ' + dr.second + '등급 '
-                + pct(dr.secondP) + ' 입니다.'
+                + '확정이 아니며, 병기를 붙이지 않았습니다. 2위는 ' + drGradeTag(dr.second)
+                + ' ' + pct(dr.secondP) + ' 입니다.'
               : dr.close
-              ? '2위 ' + dr.second + '등급 ' + pct(dr.secondP) + ' 와 근접 — 인접 등급은 사진만으로 '
-                + '구분이 어렵습니다. 더 심한 ' + dr.action + '등급 기준으로 대응합니다.'
-              : '2위 ' + dr.second + '등급 ' + pct(dr.secondP) + ' · 1단계 D 유사도 ' + pct(dr.gateP)
-                + ' 조건부')
+              ? '2위 ' + drGradeTag(dr.second) + ' ' + pct(dr.secondP) + ' 와 근접 — 인접 등급은 '
+                + '사진만으로 구분이 어렵습니다. 더 심한 ' + drGradeTag(dr.action) + ' 기준으로 '
+                + '대응합니다.'
+              : '2위 ' + drGradeTag(dr.second) + ' ' + pct(dr.secondP) + ' · 1단계 D 유사도 '
+                + pct(dr.gateP) + ' 조건부')
           : (gated
               ? 'D 유사도 ' + pct(d[1]) + ' 로 게이트(' + pct(DR_GATE) + ')는 넘었지만 중증도 '
                 + '모델이 아직 없습니다. 경증인지 증식성인지는 이 화면으로 판단할 수 없습니다 — '
@@ -1430,11 +1462,12 @@ class Component extends DCLogic {
       if (!g) return { show: 'none', label: '', pct: '', sub: '' };
       return {
         show: 'flex',
-        label: g.grade + '등급 · ' + (DR_LABELS[g.grade] || ''),
+        label: drGradeName(g.grade),
         pct: Math.round(g.p * 100) + '%',
         sub: g.close
-          ? g.second + '등급 ' + Math.round(g.secondP * 100) + '% 근접 → ' + g.action + '등급 기준'
-          : '2위 ' + g.second + '등급 ' + Math.round(g.secondP * 100) + '%'
+          ? drGradeTag(g.second) + ' ' + Math.round(g.secondP * 100) + '% 근접 → '
+            + drGradeTag(g.action) + ' 기준'
+          : '2위 ' + drGradeTag(g.second) + ' ' + Math.round(g.secondP * 100) + '%'
       };
     };
 
@@ -1506,6 +1539,7 @@ class Component extends DCLogic {
           scenario: q.scenario_name,
           patient: q.displayName + ' · ' + q.age + '세 · ' + (q.sex === 'Male' ? '남' : '여')
                    + (q.demo_primary ? ' · 라이브' : ''),
+          status: statusBadge(q.scenario_no),
           labels: 'OS ' + codes(q.osLabels) + '   OD ' + codes(q.odLabels),
           chipStyle: 'flex-shrink: 0; min-width: 22px; justify-content: center; padding: 2px 6px; '
             + (on ? 'background: var(--color-accent); color: #1E1E1E;'

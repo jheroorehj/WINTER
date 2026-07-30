@@ -51,6 +51,7 @@
         + pad('게이트', 8) + pad('2단계정답', 10) + pad('2단계1위', 16) + '판정');
 
     let s1hit = 0, s1tot = 0, gate = 0, s2hit = 0, s2tot = 0, disagree = 0;
+    const results = [];
     for (const it of cfg.items) {
       const img = await loadImage(it.url);
 
@@ -72,14 +73,14 @@
       }
 
       // 2단계 — 게이트를 넘은 눈만. 전처리는 TM 라이브러리가 한다.
-      let s2 = '-', verdict = '';
+      let s2 = '-', verdict = '', topGrade = null;
       if (p1.D > GATE) {
         gate++;
         const pr = (await net2.predict(img, false)).slice()
           .sort((a, b) => b.probability - a.probability);
         s2 = pr[0].className + ' ' + pr[0].probability.toFixed(3);
         const g = String(pr[0].className).match(/(\d+)/);
-        const topGrade = g ? parseInt(g[1], 10) : null;
+        topGrade = g ? parseInt(g[1], 10) : null;
         if (topGrade === 0) { disagree++; verdict = '불일치(2단계 DR없음)'; }
         else { verdict = '등급표시'; }
         if (it.grade) {
@@ -94,6 +95,12 @@
       put(pad(it.id, 30) + pad(it.labels || '-', 10) + pad(detS, 12)
           + pad(p1.D.toFixed(3), 7) + pad(p1.D > GATE ? '통과' : '미통과', 8)
           + pad(it.grade ? ('g' + it.grade) : '-', 10) + pad(s2, 16) + verdict);
+      results.push({
+        key: it.key || null, id: it.id,
+        truthLabels: it.labels || '', detected: detS === '-' ? '' : detS,
+        d: Math.round(p1.D * 1000) / 1000, gated: p1.D > GATE,
+        truthGrade: it.grade || null, topGrade: topGrade
+      });
     }
 
     put('');
@@ -101,6 +108,7 @@
     put('SUMMARY2 게이트 통과 ' + gate + '/' + cfg.items.length
         + ' · 2단계 등급 정답 일치 ' + s2hit + '/' + s2tot
         + ' · 불일치 노트 ' + disagree + '눈');
+    put('JSON ' + JSON.stringify(results));
     put('DONE');
   } catch (e) {
     put('ERROR ' + (e && e.message || e));

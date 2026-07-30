@@ -125,6 +125,9 @@ WINTER/
 │  ├─ images/                         시나리오별 안저 영상 20장
 │  ├─ neighbors/                      유사 사례 영상 55장 (kNN 결과에 등장한 것만)
 │  ├─ neighbors.json                   눈당 이웃 3개 — 실제 kNN 결과
+│  ├─ model_status.json                시나리오별 모델 재현 상태 배지 (측정 산출)
+│  ├─ verify_models.py                 두 모델 검증 + 배지 생성
+│  ├─ verify_models.html               ↑ 의 브라우저 쪽 (preproc.js·TM 라이브러리)
 │  ├─ make_embed_model.py              임베딩 출력 추가 (비파괴, logits 비트 동일 검증)
 │  ├─ build_neighbors.py               홀드아웃 828눈 임베딩 → kNN → 영상 복사
 │  ├─ neighbors_embed.html             ↑ 의 브라우저 쪽 (preproc.js 를 공유)
@@ -656,6 +659,32 @@ python3 data/verify_models.py            # 시연 20눈 + 등급 폴더 표본
 SUMMARY1 1단계 라벨셋 완전일치 12/24
 SUMMARY2 게이트 통과 19/24 · 2단계 등급 정답 일치 1/15 · 불일치 노트 17눈
 ```
+
+### 시나리오 이름은 정답, 상태는 배지
+
+시연 케이스 이름(`증식성 DR (4등급)` 등)은 **정답을 그대로 씁니다.** 모델이 틀려도 정답은 사실이고, 정확도 평가에 필요한 정보이기 때문입니다. 대신 현재 모델이 그 정답을 재현하는지를 **케이스 목록의 배지**로 표시합니다.
+
+```
+1   양안 정상                 [1단계 D 오탐]
+4   양안 동일 소견              [1단계 일치 · 2단계 불일치]
+9   DR 인접 등급 (2 vs 3)      [1단계 불일치 · 2단계 부분일치]
+10  증식성 DR (4등급)          [1단계 일치 · 2단계 불일치]
+```
+
+**배지는 손으로 쓰지 않습니다.** `verify_models.py` 가 측정해 `data/model_status.json` 에 쓰고 화면이 읽습니다 — 손으로 쓰면 재학습 직후 즉시 거짓이 됩니다. 측정 파일이 없으면 배지 자리만 비고 이름은 그대로 보입니다.
+
+### 등급 표기는 `grading_N`
+
+화면·데이터셋 폴더·TM 클래스가 같은 이름을 쓰도록 통일했습니다. `3등급` 이라고만 쓰면 어느 폴더의 무엇인지 되짚어야 합니다.
+
+```
+grading_1 · 경증 비증식 (Mild NPDR)
+grading_2 · 중등도 비증식 (Moderate NPDR)
+grading_3 · 중증 비증식 (Severe NPDR)
+grading_4 · 증식성 (Proliferative DR)
+```
+
+`grade0` 은 대응하는 폴더가 없으므로 `grading_0` 이라고 부르지 않고 `DR 없음` 으로 적습니다 — 없는 병기를 만들지 않습니다.
 
 ### 6. 2단계(TM) 모델이 `grade0` 으로 붕괴돼 있습니다 — **재학습 필요**
 
