@@ -9,6 +9,12 @@
      (jsDelivr 는 Access-Control-Allow-Origin: * ), 스레드는 끈다 — SharedArrayBuffer
      스레딩은 COOP/COEP 헤더를 요구하고 Vercel 정적 배포에는 그 헤더가 없다. -->
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/ort.wasm.min.js"></script>
+<!-- 2단계(Teachable Machine)용. tfjs 는 모델의 metadata 가 적어 둔 1.7.4 로 맞춘다 —
+     TM 이 그 버전으로 내보낸 layers-model 이고, 4.x 로 올리면 로드가 깨질 수 있다.
+     TM 공식 라이브러리를 쓰는 이유는 전처리(중앙 정사각 크롭 + [-1,1] 정규화)를
+     우리가 재현하지 않기 위해서다. 재현하면 어긋나고, 어긋나면 조용히 틀린다. -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.7.4/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
 <script src="./preproc.js"></script>
 </head>
 <body>
@@ -365,6 +371,9 @@
           <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; text-align: left;">
             <span style="font-size: 14px; color: var(--color-neutral-100); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ t.scenario }}</span>
             <span class="num" style="font-size: 11px; color: var(--color-neutral-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ t.patient }}</span>
+            <!-- 정답 이름은 그대로 두고, 현재 모델이 재현하는지를 배지로 적는다.
+                 data/verify_models.py 가 측정해 쓴 값이며 손으로 쓰지 않는다. -->
+            <span class="num" style="font-size: 10px; color: var(--c-warn); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ t.status }}</span>
           </span>
           <span class="num" style="flex-shrink: 0; font-size: 11px; color: var(--color-neutral-400); text-align: right;">{{ t.labels }}</span>
         </button>
@@ -491,6 +500,12 @@ const IMG = '../../data/images/';
 const NEIGHBOR_IMG = '../../data/neighbors/';
 const NEIGHBORS_URL = '../../data/neighbors.json';
 
+// 시나리오 이름은 정답을 그대로 두고, 현재 모델이 그걸 재현하는지는 이 배지로 표시한다.
+// 배지를 손으로 쓰지 않는 이유는 재학습하면 즉시 거짓이 되기 때문이다 —
+// python3 data/verify_models.py 가 측정해서 쓴다.
+const MODEL_STATUS_URL = '../../data/model_status.json';
+let MODEL_STATUS = null;
+
 // ── 모델 계약 ────────────────────────────────────────────────────────────
 // 출력은 이 순서의 길이 6 확률 벡터다. 학습 시 클래스 순서를 여기와 반드시 맞춘다.
 const LABEL_ORDER = ['N', 'D', 'G', 'A', 'H', 'O'];
@@ -535,31 +550,56 @@ function marginOf(code, p) {
 }
 
 // ── 2단계 모델 계약 (당뇨망막병증 중증도) ────────────────────────────────
-// 1단계와 성질이 다르다. 1단계는 다중라벨(한 눈에 여러 소견 공존)이지만,
-// 2단계는 병기 하나를 고르는 상호배타 4분류다 — softmax + categorical CE.
-const DR_GRADE_ORDER = [1, 2, 3, 4];
-const DR_MODEL_MULTILABEL = false;
+// Teachable Machine 로 학습된 별개 모델이다. 1단계와 공유하는 것이 하나도 없다.
+//
+//   1단계  ONNX · 다중라벨(클래스별 sigmoid) · 6클래스 · 전처리는 preproc.js
+//   2단계  TF.js(TM) · 단일라벨(softmax) · 5등급 · 전처리는 TM 라이브러리
+//
+// 전처리를 절대 공유하지 않는다. 1단계는 FOV crop + histogram match + CLAHE +
+// ImageNet 정규화를 하지만 TM 은 그런 것 없이 학습됐다(중앙 정사각 크롭 + [-1,1]).
+// 1단계 전처리를 2단계에 먹이면 학습 분포를 벗어나 조용히 틀린다. 그래서 TM 공식
+// 라이브러리에 영상 엘리먼트를 그대로 넘기고 전처리는 라이브러리가 하게 둔다 —
+// 우리가 재현하지 않으므로 어긋날 여지가 없다.
+const DR_MODEL_BASE = 'https://teachablemachine.withgoogle.com/models/PmdZHe7ke/';
+
+// 등급 목록은 모델의 metadata.json 에서 읽어 채운다. 여기에 박아 두면 모델을
+// 갈아탈 때 두 곳이 갈라진다. 기본값은 로드 실패 시의 표시용일 뿐이다.
+let DR_GRADE_ORDER = [0, 1, 2, 3, 4];
+
 const DR_LABELS = {
+  0: 'DR 없음 (No DR)',
   1: '경증 비증식 (Mild NPDR)',
   2: '중등도 비증식 (Moderate NPDR)',
   3: '중증 비증식 (Severe NPDR)',
   4: '증식성 (Proliferative DR)'
 };
-const DR_MODEL_INPUT = { size: 224, channels: 3, scale: 1 / 255, mean: null, std: null };
-const DR_MODEL_URL = '../../data/model-dr/model.json';
 
-// 1단계의 D 확률이 이 값을 넘은 눈에만 2단계를 돌린다. SUSPECT_MIN(0.15)보다
-// 높게 잡았다 — 의심 목록에 D 를 올리는 임계값과 등급을 붙이는 임계값은 다르다.
-// D 가 겨우 걸친 눈에 "3등급" 같은 단정적 병기를 붙이면 과신을 만든다.
+// 1단계의 D 확률이 이 값을 넘은 눈에만 2단계를 돌린다. 의심 목록에 D 를 올리는
+// 임계값과 등급을 붙이는 임계값은 다르다 — D 가 겨우 걸친 눈에 "3등급" 같은
+// 단정적 병기를 붙이면 과신을 만든다.
 // const 이 아닌 이유: 모델이 로드되면 postprocessing.json 의 D 임계값(0.524)으로
 // 교체된다. 0.5 는 모델이 없을 때만 쓰는 임의값이다.
 let DR_GATE = 0.5;
 
-// 학습 데이터에 "DR 없음"(grading_0) 등급이 없다. 그래서 2단계는 정상을 말할 수
-// 없고, 1단계가 D 를 틀리게 의심하면 2단계는 그래도 등급 하나를 자신 있게 낸다.
-// 화면은 등급을 단독 결론으로 쓰지 말고 항상 "1단계가 D 로 의심한 경우의 추정
-// 병기"라는 조건부로 표시할 것.
+// 2단계에 grade0("DR 없음")이 있다. 그래서 1단계와 서로 반박할 수 있다 —
+// 1단계가 D 를 의심했는데 2단계가 grade0 을 내면 두 모델이 불일치하는 것이고,
+// 그건 오류가 아니라 신호다. 그때는 등급을 병기로 쓰지 않고 불일치를 표시한다.
+// 등급은 여전히 단독 결론이 아니다: 게이트를 넘은 눈에만 돌아가므로 항상
+// "1단계가 D 로 의심한 경우의 추정"이라는 조건부다.
 const DR_CONDITIONAL_ONLY = true;
+const DR_NO_DR_GRADE = 0;
+
+// 등급 표기는 데이터셋 폴더명(grading_1~grading_4)과 TM 클래스명에 맞춘다. 화면과
+// 폴더와 모델이 같은 이름을 쓰면 "3등급" 이 어느 폴더의 무엇인지 되짚을 필요가 없다.
+// grade0 은 폴더가 없으므로 grading_0 이라고 부르지 않는다 — 없는 병기를 만들지 않는다.
+function drGradeTag(g) {
+  return g === DR_NO_DR_GRADE ? 'DR 없음' : 'grading_' + g;
+}
+function drGradeName(g) {
+  return g === DR_NO_DR_GRADE
+    ? (DR_LABELS[g] || 'DR 없음')
+    : drGradeTag(g) + ' · ' + (DR_LABELS[g] || '');
+}
 
 // ==== GENERATED — 수정하지 마세요. `python3 data/build.py` 가 이 블록을 덮어씁니다. ====
 // 출처: data/scenarios.csv (10건). 실제 데이터는 age/sex/영상/라벨뿐이며
@@ -716,12 +756,14 @@ const MODEL = {
     // Promise.all 안에 넣는 이유는 렌더 시점 경쟁을 없애기 위해서다. 밖에서 따로
     // 받으면 첫 렌더가 NEIGHBORS=null 로 지나가고, 도착해도 다시 그리지 않는다.
     const nb = fetch(NEIGHBORS_URL).then(r => r.ok ? r.json() : null).catch(() => null);
+    const st = fetch(MODEL_STATUS_URL).then(r => r.ok ? r.json() : null).catch(() => null);
     return Promise.all([
       j('preprocessing'), j('postprocessing'), j('color_reference'),
-      ort.InferenceSession.create(MODEL_URL, { executionProviders: ['wasm'] }), nb
+      ort.InferenceSession.create(MODEL_URL, { executionProviders: ['wasm'] }), nb, st
     ]).then(r => {
       const pre = r[0], post = r[1], ref = r[2], net = r[3];
       NEIGHBORS = r[4];
+      MODEL_STATUS = r[5];
       // 라벨 순서가 화면 계약과 다르면 즉시 멈춘다. 어긋난 채로 돌면 소견 이름이
       // 뒤바뀐 화면이 나오고, 그건 오류보다 위험하다.
       if (post.labels.join(',') !== LABEL_ORDER.join(',')) {
@@ -772,28 +814,62 @@ const MODEL = {
 };
 
 // ── 2단계 모델 연결 지점 ────────────────────────────────────────────────
-// 1단계와 같은 구조지만 별개의 모델이다. 가중치를 공유하지 않고 산출물도 따로 나온다.
-// 2단계 산출물은 아직 없다. status='unavailable' 이면 게이트를 넘은 눈이라도
-// 등급을 내지 않고 "모델 미연결"로 표시한다.
+// Teachable Machine 모델. 1단계와 공유하는 것이 하나도 없다 — 런타임(TF.js vs ONNX),
+// 학습 방식(softmax vs 다중라벨 sigmoid), 전처리가 모두 다르다.
 //
-// 1단계가 실제 모델인데 2단계만 목업 등급을 내면, 화면에서 둘을 구별할 수 없어
-// 지어낸 병기가 실측값처럼 읽힌다. 그건 오류보다 위험하다 — 목업으로 되돌리지 말 것.
-// 2단계 가중치가 나오면 status 를 'mock' 이 아니라 'loading' 으로 바꾸고 아래
-// load/infer 를 MODEL 과 같은 방식으로 채운다.
+// 전처리를 우리가 하지 않는 것이 핵심이다. TM 라이브러리에 영상 엘리먼트를 그대로
+// 넘기면 라이브러리가 학습 때와 같은 전처리(중앙 정사각 크롭 + [-1,1])를 한다.
+// 1단계의 preprocess() 를 여기에 쓰면 CLAHE·histogram match 가 섞여 학습 분포를
+// 벗어나고, 오류 없이 조용히 틀린다.
 const DR_MODEL = {
-  status: 'unavailable',       // 'unavailable' | 'loading' | 'ready' | 'error' | 'mock'
+  status: 'loading',           // 'loading' | 'ready' | 'error'
   net: null,
-  meta: null,
+  labels: null,                // metadata.json 의 원본 라벨명
+  gradeOf: null,               // 라벨명 → 등급 번호
 
   load: function () {
-    return Promise.resolve();
+    if (typeof tmImage === 'undefined' || typeof tf === 'undefined') {
+      return Promise.reject(new Error('Teachable Machine 라이브러리를 불러오지 못했습니다 (네트워크 확인)'));
+    }
+    const self = this;
+    return tmImage.load(DR_MODEL_BASE + 'model.json', DR_MODEL_BASE + 'metadata.json')
+      .then(function (net) {
+        self.net = net;
+        const labels = net.getClassLabels();
+        // 라벨명에서 등급 번호를 뽑는다 (grade0..grade4 → 0..4). 숫자가 없는
+        // 라벨이 하나라도 있으면 등급 매핑을 신뢰할 수 없으므로 멈춘다 —
+        // 순서를 추측해 붙이면 병기가 뒤바뀐 화면이 나온다.
+        const gradeOf = {};
+        const grades = [];
+        for (let i = 0; i < labels.length; i++) {
+          const m = String(labels[i]).match(/(\d+)/);
+          if (!m) throw new Error('등급 번호를 읽을 수 없는 라벨: "' + labels[i] + '"');
+          const g = parseInt(m[1], 10);
+          gradeOf[labels[i]] = g;
+          grades.push(g);
+        }
+        grades.sort(function (a, b) { return a - b; });
+        self.labels = labels;
+        self.gradeOf = gradeOf;
+        DR_GRADE_ORDER = grades;         // 계약을 모델에서 가져온다
+        self.status = 'ready';
+      });
   },
 
-  // imgUrl → DR_GRADE_ORDER 순서의 확률 배열(길이 4). softmax 라 합이 1이다.
-  // hint 는 목업 전용(정답 등급)이며 실제 구현은 영상만 보고 무시해야 한다.
-  infer: function (imgUrl, hint) {
-    if (this.status === 'unavailable') return Promise.resolve(null);
-    return Promise.resolve(mockDrVector(hint.grade, hint.seed));
+  // imgUrl → DR_GRADE_ORDER 순서의 확률 배열. softmax 라 합이 1이다.
+  // 정답 라벨을 참조하지 않는다 — 영상만 본다.
+  infer: function (imgUrl) {
+    if (!this.net) return Promise.resolve(null);
+    const self = this;
+    return loadImage(imgUrl).then(function (img) {
+      return self.net.predict(img, false);       // 전처리는 TM 라이브러리가 한다
+    }).then(function (preds) {
+      const byGrade = {};
+      for (let i = 0; i < preds.length; i++) {
+        byGrade[self.gradeOf[preds[i].className]] = preds[i].probability;
+      }
+      return DR_GRADE_ORDER.map(function (g) { return byGrade[g] || 0; });
+    });
   }
 };
 
@@ -817,23 +893,6 @@ function mockVector(labels, seed) {
   });
 }
 
-// 목업 등급 분포. 정답 등급을 1위로 두되 인접 등급에 의미 있는 질량을 남긴다 —
-// 인접 등급은 실제로 사진만으로 구분이 어렵고, 여기서 0.97 같은 값을 만들면 화면이
-// 없는 확신을 연출한다. 정답 등급이 없으면(1단계가 D 를 오탐한 상황) 평평하게 퍼져
-// "판단 불가"에 가까운 분포가 된다 — 2단계는 정상을 말할 수 없으므로 그게 최선이다.
-function mockDrVector(grade, seed) {
-  const raw = DR_GRADE_ORDER.map(g => {
-    const j = mockJitter(seed + 'g' + g);
-    if (!grade) return 0.20 + j * 0.14;
-    const d = Math.abs(g - grade);
-    if (d === 0) return 0.46 + j * 0.16;
-    if (d === 1) return 0.14 + j * 0.14;
-    if (d === 2) return 0.04 + j * 0.06;
-    return 0.01 + j * 0.03;
-  });
-  const sum = raw.reduce((a, b) => a + b, 0);
-  return raw.map(v => v / sum);                  // softmax 출력처럼 합이 1
-}
 
 // 확률 벡터 → 화면이 쓰는 [[코드, 확률], ...] 내림차순. 모델이 바뀌어도 이 어댑터는 그대로다.
 function toPairs(vec) {
@@ -847,14 +906,18 @@ function toGrade(vec, gateP) {
   const pairs = DR_GRADE_ORDER
     .map((g, i) => [g, Math.round((vec[i] || 0) * 100) / 100])
     .sort((a, b) => b[1] - a[1]);
-  const top = pairs[0], second = pairs[1];
+  const top = pairs[0], second = pairs[1] || [top[0], 0];
   const close = (top[1] - second[1]) < DR_CLOSE_AT;
   // 1·2위가 근접하면 더 심한 쪽 기준으로 대응한다. 2등급인지 3등급인지 갈릴 때
   // 낮은 쪽으로 처리하면 놓치는 손해가 크다 — 불확실성은 안전한 방향으로 해소한다.
+  const action = close ? Math.max(top[0], second[0]) : top[0];
   return {
     pairs: pairs, grade: top[0], p: top[1], label: DR_LABELS[top[0]],
     second: second[0], secondP: second[1],
-    close: close, action: close ? Math.max(top[0], second[0]) : top[0],
+    close: close, action: action,
+    // 1단계가 D 를 의심했는데 2단계가 "DR 없음"을 냈다 = 두 모델의 불일치.
+    // 오류가 아니라 신호다. 병기로 쓰지 않고 불일치를 표시한다.
+    noDr: action === DR_NO_DR_GRADE,
     gateP: gateP
   };
 }
@@ -872,10 +935,10 @@ function inferScenario(sc) {
   const grade = (eye, pairs) => {
     const d = (pairs.find(x => x[0] === 'D') || [])[1] || 0;
     if (!(d > DR_GATE)) return Promise.resolve(null);   // 학습과 같은 strict >
-    return DR_MODEL.infer(
-      IMG + sc[eye + 'Image'],
-      { grade: sc[eye === 'os' ? 'osDrGrade' : 'odDrGrade'], seed: sc.scenario_no + eye + 'dr' }
-    ).then(v => v ? toGrade(v, d) : null);      // null = 2단계 모델 없음
+    // 정답 등급을 넘기지 않는다. 목업이 없어졌으므로 hint 가 필요 없고, 남겨 두면
+    // 정답을 훔쳐보는 추론으로 되돌아갈 여지가 생긴다.
+    return DR_MODEL.infer(IMG + sc[eye + 'Image'])
+      .then(v => v ? toGrade(v, d) : null);     // null = 2단계 모델 로드 실패
   };
 
   return Promise.all([one('os'), one('od')]).then(r =>
@@ -971,14 +1034,19 @@ function clinical(sc, osPreds, odPreds, osDr, odDr) {
     const head = (eye === 'os' ? 'OS ' : 'OD ') + pct(found[code][eye]);
     if (code !== 'D' || !dr[eye]) return head;
     const g = dr[eye];
-    return head + ' · ' + g.grade + '등급'
-      + (g.close ? ' (' + g.second + '등급과 근접 → ' + g.action + '등급 기준)' : '');
+    if (g.noDr) return head + ' · 2단계는 DR 없음 (1단계와 불일치)';
+    return head + ' · ' + drGradeTag(g.grade)
+      + (g.close ? ' (' + drGradeTag(g.second) + ' 근접 → ' + drGradeTag(g.action) + ' 기준)' : '');
   }).filter(Boolean).join('   ');
 
   // D 의 시급도·사유는 등급에서 나온다. 두 눈의 등급이 다르면 더 심한 쪽을 따른다 —
   // 한쪽이 증식성이면 그 환자는 증식성 환자다.
+  // grade0("DR 없음")은 시급도 파생에 쓰지 않는다. 2단계가 DR 을 부정하면 병기가
+  // 없는 것이고, 그때 시급도는 1단계 유사도 기준으로 떨어진다(아래 urgency 참고).
   const drWorst = (() => {
-    const gs = ['os', 'od'].filter(e => found.D && found.D[e] && dr[e]).map(e => dr[e].action);
+    const gs = ['os', 'od']
+      .filter(e => found.D && found.D[e] && dr[e] && !dr[e].noDr)
+      .map(e => dr[e].action);
     return gs.length ? DR_GRADE_RULES[Math.max.apply(null, gs)] : null;
   })();
 
@@ -1045,11 +1113,28 @@ function clinical(sc, osPreds, odPreds, osDr, odDr) {
     });
   }
 
-  // (2) 양안 DR 등급 비대칭 — 더 심한 쪽으로 대응하지만 반대쪽이 안전한 것은 아니다.
-  if (found.D && dr.os && dr.od && dr.os.grade !== dr.od.grade) {
+  // (2) 1단계와 2단계의 불일치. 서로 다른 데이터·구조로 학습된 두 모델이 반대로
+  // 말하는 것이므로 어느 쪽도 확정이 아니다. 감추면 화면이 근거 없이 한쪽을 택한다.
+  const disagree = ['os', 'od'].filter(e => found.D && found.D[e] && dr[e] && dr[e].noDr);
+  if (disagree.length) {
+    const eyeName = (e) => e === 'os' ? '좌안' : '우안';
     notes.push({
-      title: '양안 DR 등급이 다릅니다 — 좌안 ' + dr.os.grade + '등급 · 우안 ' + dr.od.grade + '등급',
-      body: '시급도는 더 심한 ' + Math.max(dr.os.action, dr.od.action) + '등급 기준으로 정했습니다. '
+      title: '1단계와 2단계가 불일치 — ' + disagree.map(eyeName).join(' · '),
+      body: '1단계는 당뇨망막병증을 의심했지만(' +
+        disagree.map(e => eyeName(e) + ' ' + pct(found.D[e])).join(' · ') +
+        ') 2단계는 "DR 없음"으로 판단했습니다. 서로 다른 데이터와 구조로 학습된 두 '
+        + '모델이라 이런 불일치가 생길 수 있고, 어느 쪽도 확정이 아닙니다. 병기를 '
+        + '붙이지 않았으며 시급도는 1단계 기준으로 정했습니다 — 안과에서 확인해야 합니다.'
+    });
+  }
+
+  // (3) 양안 DR 등급 비대칭 — 더 심한 쪽으로 대응하지만 반대쪽이 안전한 것은 아니다.
+  if (found.D && dr.os && dr.od && !dr.os.noDr && !dr.od.noDr && dr.os.grade !== dr.od.grade) {
+    notes.push({
+      title: '양안 DR 등급이 다릅니다 — 좌안 ' + drGradeTag(dr.os.grade)
+             + ' · 우안 ' + drGradeTag(dr.od.grade),
+      body: '시급도는 더 심한 ' + drGradeTag(Math.max(dr.os.action, dr.od.action))
+        + ' 기준으로 정했습니다. '
         + '반대쪽 눈이 안전하다는 뜻이 아닙니다 — 등급이 낮은 눈도 같은 전신 위험을 공유하며 '
         + '진행 속도가 다를 수 있으므로 두 눈을 각각 추적하세요.'
     });
@@ -1082,6 +1167,12 @@ function buildPatient(sc, preds) {
 
 const EYE = { os: { label: '좌안 (OS)', code: 'OS' }, od: { label: '우안 (OD)', code: 'OD' } };
 
+// 측정 파일이 없거나 아직 안 왔으면 빈 문자열 — 배지 자리만 비고 이름은 그대로 보인다.
+function statusBadge(no) {
+  const sc = MODEL_STATUS && MODEL_STATUS.scenarios && MODEL_STATUS.scenarios[String(no)];
+  return sc ? sc.badge : '';
+}
+
 class Component extends DCLogic {
   state = {
     idx: 0,
@@ -1110,14 +1201,17 @@ class Component extends DCLogic {
     // 모델 로드 → 현재 시나리오 추론. 실제 모델은 여기서 수 초가 걸린다.
     // 2단계 모델도 함께 받는다 — D 가 나온 뒤에 로드하면 화면이 두 번 기다린다.
     this.setState({ modelStatus: 'loading' });
-    Promise.all([MODEL.load(), DR_MODEL.load()]).then(() => {
+    // 2단계 실패가 1단계를 죽이면 안 된다. 1단계만 있어도 의심 소견은 나오고,
+    // 등급 없는 화면은 이미 정상 상태로 설계돼 있다(게이트 미통과와 같은 표시).
+    // 반대로 DR_MODEL.status 를 성공 여부와 무관하게 올리면, net 이 없는데도
+    // 가드가 풀려 화면이 없는 등급을 말하게 된다 — 실제로 겪은 버그다.
+    const stage2 = DR_MODEL.load().catch((e) => {
+      DR_MODEL.status = 'error';
+      DR_MODEL.error = String(e && e.message || e);
+    });
+    Promise.all([MODEL.load(), stage2]).then(() => {
       if (!this._alive) return;
       MODEL.status = 'ready';
-      // DR_MODEL 은 여기서 'ready' 로 올리지 않는다. 가중치가 없는데 상태만 올리면
-      // infer() 의 unavailable 가드가 풀려 목업 등급이 실측값처럼 화면에 뜬다 —
-      // 1단계가 실제 모델인 상황에서 그건 지어낸 병기를 근거로 의뢰를 보내는 것이다.
-      // 실제로 겪은 버그이므로 되돌리지 말 것. net 이 생겼을 때만 올린다.
-      if (DR_MODEL.net) DR_MODEL.status = 'ready';
       this.setState({ modelStatus: 'ready' });
       this.infer(this.state.idx);
     }, (e) => {
@@ -1207,14 +1301,21 @@ class Component extends DCLogic {
         // 2단계는 D 행에만 붙는다. 게이트를 넘지 못했으면 그 사실을 적는다.
         drShow: isD ? 'flex' : 'none',
         drText: !isD ? '' : (dr
-          ? dr.grade + '등급 · ' + (DR_LABELS[dr.grade] || '') + '  ' + pct(dr.p)
-          : (gated ? '중증도 미판정 — 2단계 모델 미연결' : '중증도 미측정')),
+          ? (dr.noDr
+              ? 'DR 없음 ' + pct(dr.p) + ' — 1단계와 불일치'
+              : drGradeName(dr.grade) + '  ' + pct(dr.p))
+          : (gated ? '중증도 미판정 — 2단계 모델 로드 실패' : '중증도 미측정')),
         drNote: !isD ? '' : (dr
-          ? (dr.close
-              ? '2위 ' + dr.second + '등급 ' + pct(dr.secondP) + ' 와 근접 — 인접 등급은 사진만으로 '
-                + '구분이 어렵습니다. 더 심한 ' + dr.action + '등급 기준으로 대응합니다.'
-              : '2위 ' + dr.second + '등급 ' + pct(dr.secondP) + ' · 1단계 D 유사도 ' + pct(dr.gateP)
-                + ' 조건부')
+          ? (dr.noDr
+              ? '2단계가 당뇨망막병증을 부정했습니다. 두 모델이 반대로 말하므로 어느 쪽도 '
+                + '확정이 아니며, 병기를 붙이지 않았습니다. 2위는 ' + drGradeTag(dr.second)
+                + ' ' + pct(dr.secondP) + ' 입니다.'
+              : dr.close
+              ? '2위 ' + drGradeTag(dr.second) + ' ' + pct(dr.secondP) + ' 와 근접 — 인접 등급은 '
+                + '사진만으로 구분이 어렵습니다. 더 심한 ' + drGradeTag(dr.action) + ' 기준으로 '
+                + '대응합니다.'
+              : '2위 ' + drGradeTag(dr.second) + ' ' + pct(dr.secondP) + ' · 1단계 D 유사도 '
+                + pct(dr.gateP) + ' 조건부')
           : (gated
               ? 'D 유사도 ' + pct(d[1]) + ' 로 게이트(' + pct(DR_GATE) + ')는 넘었지만 중증도 '
                 + '모델이 아직 없습니다. 경증인지 증식성인지는 이 화면으로 판단할 수 없습니다 — '
@@ -1361,11 +1462,12 @@ class Component extends DCLogic {
       if (!g) return { show: 'none', label: '', pct: '', sub: '' };
       return {
         show: 'flex',
-        label: g.grade + '등급 · ' + (DR_LABELS[g.grade] || ''),
+        label: drGradeName(g.grade),
         pct: Math.round(g.p * 100) + '%',
         sub: g.close
-          ? g.second + '등급 ' + Math.round(g.secondP * 100) + '% 근접 → ' + g.action + '등급 기준'
-          : '2위 ' + g.second + '등급 ' + Math.round(g.secondP * 100) + '%'
+          ? drGradeTag(g.second) + ' ' + Math.round(g.secondP * 100) + '% 근접 → '
+            + drGradeTag(g.action) + ' 기준'
+          : '2위 ' + drGradeTag(g.second) + ' ' + Math.round(g.secondP * 100) + '%'
       };
     };
 
@@ -1407,14 +1509,15 @@ class Component extends DCLogic {
       modelTag: this.props.modelTag || (function (st) {
         // 2단계는 조건부라 항상 돌지 않는다. 게이트와 2단계 상태를 함께 적어
         // "등급이 없는 눈"이 오류가 아니라 설계라는 것을 화면에서 알 수 있게 한다.
-        const stage2 = DR_MODEL.status === 'unavailable'
-          ? '2단계 미연결' : '2단계 {' + DR_GRADE_ORDER.join(',') + '}';
+        const stage2 = DR_MODEL.status === 'ready'
+          ? '2단계 TM {' + DR_GRADE_ORDER.join(',') + '}'
+          : (DR_MODEL.status === 'error' ? '2단계 로드 실패' : '2단계 로딩 중');
         const set = ' · 1단계 {' + LABEL_ORDER.join(',') + '} → D ≥ '
           + Math.round(DR_GATE * 100) + '% 인 눈만 ' + stage2;
         if (st.modelStatus === 'error') return '모델 오류 — ' + st.modelError;
         if (st.modelStatus === 'loading') return '모델 로딩 중 (28.5MB)' + set;
         if (!preds) return '추정 중' + set;
-        return (MODEL.net ? 'stage1 ConvNeXt V2-Tiny int8 · ONNX Runtime Web'
+        return (MODEL.net ? 'stage1 ConvNeXt V2-Tiny int8 · ONNX · stage2 Teachable Machine · TF.js'
                           : '목업 추정 · 모델 미연결') + set;
       })(this.state),
       picker: this.state.picker,
@@ -1436,6 +1539,7 @@ class Component extends DCLogic {
           scenario: q.scenario_name,
           patient: q.displayName + ' · ' + q.age + '세 · ' + (q.sex === 'Male' ? '남' : '여')
                    + (q.demo_primary ? ' · 라이브' : ''),
+          status: statusBadge(q.scenario_no),
           labels: 'OS ' + codes(q.osLabels) + '   OD ' + codes(q.odLabels),
           chipStyle: 'flex-shrink: 0; min-width: 22px; justify-content: center; padding: 2px 6px; '
             + (on ? 'background: var(--color-accent); color: #1E1E1E;'

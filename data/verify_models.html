@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<!--
+  두 모델을 화면과 같은 방식으로 돌려 정답과 대조한다. data/verify_models.py 가
+  헤드리스 Chrome 으로 이 페이지를 열고 결과를 DOM 에서 읽어 간다.
+
+  왜 파이썬이 아니라 브라우저인가. 검증 대상은 "배포된 화면이 내는 값"이다. 파이썬으로
+  다시 구현하면 화면과 다른 것을 재는 것이 되고, 그 편차를 모델 탓으로 오해한다 —
+  실제로 그렇게 잘못된 수치를 문서에 적은 적이 있다(README 알려진 문제 2번).
+  그래서 1단계는 화면과 같은 preproc.js 를, 2단계는 TM 공식 라이브러리를 쓴다.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/ort.wasm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.7.4/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
+<script src="../frontend/project/preproc.js"></script>
+</head>
+<body>
+<pre id="out"></pre>
+<script>
+(async () => {
+  const el = document.getElementById('out');
+  const put = (s) => { el.textContent += s + '\n'; };
+  const pad = (s, n) => String(s) + ' '.repeat(Math.max(0, n - String(s).length));
+  try {
+    ort.env.wasm.numThreads = 1;
+    ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/';
+
+    const cfg = await fetch('./_verify_list.json').then(r => r.json());
+    const j = (s) => fetch('../data/model/stage1_odir_convnextv2_tiny_' + s + '.json').then(r => r.json());
+    const [pre, post, ref, net1, net2] = await Promise.all([
+      j('preprocessing'), j('postprocessing'), j('color_reference'),
+      ort.InferenceSession.create(cfg.stage1Url, { executionProviders: ['wasm'] }),
+      tmImage.load(cfg.stage2Base + 'model.json', cfg.stage2Base + 'metadata.json')
+    ]);
+
+    const L = post.labels;
+    const thr = {}, temp = {};
+    L.forEach((c, i) => { thr[c] = post.thresholds[i]; temp[c] = post.temperature[i]; });
+    const GATE = thr.D;               // 화면과 같다 — 게이트는 D 임계값에 묶여 있다
+    const meta = { pre: pre, ref: ref };
+    const labels2 = net2.getClassLabels();
+
+    put('STAGE1 ' + cfg.stage1Url);
+    put('STAGE2 ' + cfg.stage2Base + '  labels=' + labels2.join(','));
+    put('THR    ' + L.map(c => c + ' ' + thr[c].toFixed(3)).join('  '));
+    put('GATE   D > ' + GATE.toFixed(3));
+    put('');
+    put(pad('영상', 30) + pad('1단계정답', 10) + pad('1단계검출', 12) + pad('D', 7)
+        + pad('게이트', 8) + pad('2단계정답', 10) + pad('2단계1위', 16) + '판정');
+
+    let s1hit = 0, s1tot = 0, gate = 0, s2hit = 0, s2tot = 0, disagree = 0;
+    const results = [];
+    for (const it of cfg.items) {
+      const img = await loadImage(it.url);
+
+      // 1단계 — 화면과 같은 전처리(preproc.js) + 같은 후처리(temperature → threshold)
+      const feed = {};
+      feed[net1.inputNames[0]] = new ort.Tensor(
+        'float32', preprocess(img, meta), [1, 3, pre.img_size, pre.img_size]);
+      const logits = (await net1.run(feed))[net1.outputNames[0]].data;
+      const p1 = {}, det = [];
+      L.forEach((c, i) => {
+        p1[c] = 1 / (1 + Math.exp(-logits[i] / temp[c]));
+        if (c !== 'N' && p1[c] > thr[c]) det.push(c);        // 학습과 같은 strict >
+      });
+      const detS = det.slice().sort().join('|') || '-';
+      if (it.labels) {
+        s1tot++;
+        const gt = it.labels.split('|').filter(x => x !== 'N').sort().join('|') || '-';
+        if (gt === detS) s1hit++;
+      }
+
+      // 2단계 — 게이트를 넘은 눈만. 전처리는 TM 라이브러리가 한다.
+      let s2 = '-', verdict = '', topGrade = null;
+      if (p1.D > GATE) {
+        gate++;
+        const pr = (await net2.predict(img, false)).slice()
+          .sort((a, b) => b.probability - a.probability);
+        s2 = pr[0].className + ' ' + pr[0].probability.toFixed(3);
+        const g = String(pr[0].className).match(/(\d+)/);
+        topGrade = g ? parseInt(g[1], 10) : null;
+        if (topGrade === 0) { disagree++; verdict = '불일치(2단계 DR없음)'; }
+        else { verdict = '등급표시'; }
+        if (it.grade) {
+          s2tot++;
+          if (topGrade === it.grade) { s2hit++; verdict += ' ✓'; }
+          else { verdict += ' ✗'; }
+        }
+      } else {
+        verdict = '게이트 미통과';
+      }
+
+      put(pad(it.id, 30) + pad(it.labels || '-', 10) + pad(detS, 12)
+          + pad(p1.D.toFixed(3), 7) + pad(p1.D > GATE ? '통과' : '미통과', 8)
+          + pad(it.grade ? ('g' + it.grade) : '-', 10) + pad(s2, 16) + verdict);
+      results.push({
+        key: it.key || null, id: it.id,
+        truthLabels: it.labels || '', detected: detS === '-' ? '' : detS,
+        d: Math.round(p1.D * 1000) / 1000, gated: p1.D > GATE,
+        truthGrade: it.grade || null, topGrade: topGrade
+      });
+    }
+
+    put('');
+    put('SUMMARY1 1단계 라벨셋 완전일치 ' + s1hit + '/' + s1tot);
+    put('SUMMARY2 게이트 통과 ' + gate + '/' + cfg.items.length
+        + ' · 2단계 등급 정답 일치 ' + s2hit + '/' + s2tot
+        + ' · 불일치 노트 ' + disagree + '눈');
+    put('JSON ' + JSON.stringify(results));
+    put('DONE');
+  } catch (e) {
+    put('ERROR ' + (e && e.message || e));
+  }
+})();
+</script>
+</body>
+</html>
