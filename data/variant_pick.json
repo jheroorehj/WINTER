@@ -1,8 +1,8 @@
 {
  "maxVariants": 5,
  "liveGraded": 1,
- "livePlain": 4,
- "note": "시나리오마다 가장 결과 좋은 변형을 골랐다. live=true 는 심사에서 보여줄 구성으로, 2단계 등급을 맞힌 1건과 중증도가 화면에 끼어들지 않는 4건이다. 고른 케이스는 전체를 대표하지 않으므로 홀드아웃 전체 수치(verify_models.py SUMMARY)를 함께 제시할 것.",
+ "livePlain": 3,
+ "note": "시나리오마다 가장 결과 좋은 변형을 골랐다. live=true 는 심사에서 보여줄 구성으로, 2단계 등급을 맞힌 1건과 중증도가 화면에 끼어들지 않는 3건이다. 고른 케이스는 전체를 대표하지 않으므로 홀드아웃 전체 수치(verify_models.py SUMMARY)를 함께 제시할 것. s5 는 양안이 다른 데이터셋(IDRiD 정사각 + ODIR 4:3)에서 와 사진 비율이 달라 라이브에서 제외했다.",
  "pick": {
   "4": {
    "k": 1,
@@ -180,7 +180,7 @@
    "age": "66",
    "sex": "Male",
    "patient_level_labels": "D|H",
-   "live": true,
+   "live": false,
    "score": 10,
    "stage2_hit": 0,
    "stage2_total": 1,

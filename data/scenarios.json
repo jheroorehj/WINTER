@@ -213,7 +213,7 @@
       "scenario_no": 5,
       "scenario_key": "bilateral_diff",
       "scenario_name": "양안 서로 다른 소견",
-      "demo_primary": 1,
+      "demo_primary": 0,
       "proves": "양안을 하나의 순위로 합치는 UI가 깨지는 케이스",
       "patient_id": "4215",
       "age": "66",

@@ -60,6 +60,14 @@ MAX_VARIANTS = 5
 # 반사광은 이 지표로 잡히지 않는다 — 완전한 화질 평가가 아니라 하한 필터다.
 QUALITY_MIN = -5.0
 QUALITY_CANDIDATES = 40        # 화질을 계산해 볼 환자 후보 수 (모델 측정보다 훨씬 싸다)
+
+# 라이브에 올릴 때 양안 사진의 종횡비가 이 이상 다르면 제외한다.
+#
+# 왜. 한 환자의 두 눈이 다른 데이터셋에서 오면(IDRiD 정사각 letterbox + ODIR 4:3)
+# 화면에서 사진 두 장의 비율이 달라 같은 촬영으로 보이지 않는다. 임상의가 보면
+# "이 둘이 같은 환자인가"부터 의심한다. 시나리오 데이터에서 빼는 것이 아니라
+# 라이브 표시에서만 제외한다 — 정확도 측정에는 계속 쓴다.
+ASPECT_TOL = 0.15
 STAGE1_URL = ('https://huggingface.co/HEROJ137/WINTER-retina-models'
               '/resolve/main/stage1_odir_convnextv2_tiny_int8.onnx')
 STAGE2_BASE = 'https://teachablemachine.withgoogle.com/models/PmdZHe7ke/'
@@ -139,6 +147,16 @@ def display_quality(path):
     lap = g[1:-1, 2:] + g[1:-1, :-2] + g[2:, 1:-1] + g[:-2, 1:-1] - 4 * g[1:-1, 1:-1]
     focus = float(lap[m[1:-1, 1:-1]].std())
     return focus / 6.0 - off * 200 - dull * 20
+
+
+def aspect(path):
+    """종횡비. 읽을 수 없으면 None."""
+    try:
+        from PIL import Image
+        w, h = Image.open(path).size
+        return w / float(h) if h else None
+    except Exception:
+        return None
 
 
 def raw_or_model_path(pid, side, fallback):
@@ -278,7 +296,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--live-graded', type=int, default=1,
                     help='라이브 중 2단계 등급을 맞힌 케이스 개수')
-    ap.add_argument('--live-plain', type=int, default=4,
+    ap.add_argument('--live-plain', type=int, default=3,
                     help='라이브 중 중증도가 화면에 끼어들지 않는 케이스 개수')
     args = ap.parse_args()
 
@@ -343,11 +361,24 @@ def main():
         return sum(1 for t in ('os', 'od')
                    if v['eyes_measured'].get(t, {}).get('gated'))
 
-    graded_pool = [(sc, no, v) for sc, no, v in ranked if v is best.get(no) and v['score'][1] > 0]
+    def aspect_ok(v):
+        """양안 사진의 종횡비가 비슷한가. 화면에 나란히 놓이므로 크게 다르면 안 된다."""
+        ar = []
+        for t in ('os', 'od'):
+            e = v['eyes'][t]
+            side = 'left' if t == 'os' else 'right'
+            ar.append(aspect(raw_or_model_path(v['pid'], side, e['src'])))
+        if any(a is None for a in ar):
+            return True                       # 판단 불가 — 막지 않는다
+        lo, hi = min(ar), max(ar)
+        return (hi - lo) / hi <= ASPECT_TOL
+
+    graded_pool = [(sc, no, v) for sc, no, v in ranked
+                   if v is best.get(no) and v['score'][1] > 0 and aspect_ok(v)]
     live = [no for _, no, _ in graded_pool[:args.live_graded]]
 
     plain = [(sc, no, v) for sc, no, v in ranked
-             if v is best.get(no) and no not in live]
+             if v is best.get(no) and no not in live and aspect_ok(v)]
     # 게이트 통과 눈이 적은 것 우선, 그다음 1단계 정확도
     plain.sort(key=lambda x: (gated_eyes(x[2]), -x[2]['score'][2], int(x[1])))
     live += [no for _, no, _ in plain[:args.live_plain]]
@@ -397,6 +428,10 @@ def main():
         v = best[no]
         print('  라이브 s%-3s 2단계 %d/%d · 1단계 %d/2 · 게이트 통과 %d눈'
               % (no, v['score'][1], v['score'][3], v['score'][2], gated_eyes(v)))
+    skipped = [no for no in best if no not in live and not aspect_ok(best[no])]
+    if skipped:
+        print('  종횡비 불일치로 라이브 제외: %s (양안이 다른 데이터셋)'
+              % ', '.join('s' + n for n in sorted(skipped, key=int)))
     print('\n다음: python3 data/build.py  (선택된 영상을 data/images/ 로 복사)')
 
 
