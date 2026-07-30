@@ -115,12 +115,9 @@
          병변 위치 정렬이 유지되고, AI 추정 오버레이 텍스트는 래퍼 밖이라 반전되지 않는다. -->
     <div style="position: relative; background: var(--color-surface); border-radius: var(--radius-md); overflow: hidden; display: flex; flex-direction: column; min-width: 0;">
       <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) var(--space-4); flex-shrink: 0;">
-        <div style="display: flex; align-items: baseline; gap: var(--space-3); min-width: 0;">
+        <div style="display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; flex-wrap: nowrap; overflow: hidden;">
           <span style="font-family: var(--font-heading); font-weight: 500; font-size: 20px;">좌안</span>
           <span class="tag" style="border: 1px solid var(--color-accent); color: var(--color-accent-300);">OS</span>
-          <span class="num" style="font-size: 11px; color: var(--color-neutral-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ p.os.file }}</span>
-          <span style="font-size: 11px; color: var(--color-neutral-400); white-space: nowrap;">화질 {{ p.os.quality }}</span>
-          <span class="num" style="font-size: 11px; color: var(--color-neutral-500); white-space: nowrap;">이웃 라벨 일치 {{ agreeOS }}</span>
         </div>
         <div style="display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;">
           <button onClick="{{ toggleCam }}" style="{{ camBtnStyle }}">CAM</button>
@@ -159,12 +156,9 @@
 
     <div style="position: relative; background: var(--color-surface); border-radius: var(--radius-md); overflow: hidden; display: flex; flex-direction: column; min-width: 0;">
       <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) var(--space-4); flex-shrink: 0;">
-        <div style="display: flex; align-items: baseline; gap: var(--space-3); min-width: 0;">
+        <div style="display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; flex-wrap: nowrap; overflow: hidden;">
           <span style="font-family: var(--font-heading); font-weight: 500; font-size: 20px;">우안</span>
           <span class="tag" style="border: 1px solid var(--color-accent); color: var(--color-accent-300);">OD</span>
-          <span class="num" style="font-size: 11px; color: var(--color-neutral-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ p.od.file }}</span>
-          <span style="font-size: 11px; color: var(--color-neutral-400); white-space: nowrap;">화질 {{ p.od.quality }}</span>
-          <span class="num" style="font-size: 11px; color: var(--color-neutral-500); white-space: nowrap;">이웃 라벨 일치 {{ agreeOD }}</span>
         </div>
         <div style="display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;">
           <span style="font-size: 11px; color: var(--color-neutral-500); white-space: nowrap;">클릭 확대</span>
@@ -387,9 +381,6 @@
         <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); padding: var(--space-3) var(--space-6);">
           <div style="display: flex; align-items: baseline; gap: var(--space-4); min-width: 0;">
             <span style="font-family: var(--font-heading); font-weight: 500; font-size: 20px;">{{ viewer.label }}</span>
-            <span class="num" style="font-size: 12px; color: var(--color-neutral-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ viewer.file }}</span>
-            <span style="font-size: 12px; color: var(--color-neutral-400); white-space: nowrap;">화질 {{ viewer.quality }}</span>
-            <span class="num" style="font-size: 12px; color: var(--color-neutral-500); white-space: nowrap;">이웃 라벨 일치 {{ viewer.agree }}</span>
           </div>
           <div style="display: flex; align-items: center; gap: var(--space-3); flex-shrink: 0;">
             <span style="font-size: 11px; color: var(--color-neutral-500);">휠 확대 · 드래그 이동</span>
@@ -444,7 +435,6 @@
             </div>
             <div class="onimg" style="position: absolute; top: var(--space-4); left: var(--space-6); right: var(--space-6); display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4);">
               <span style="font-family: var(--font-heading); font-weight: 500; font-size: 17px; color: var(--color-neutral-100);">현재 환자 · {{ compare.eyeCode }}</span>
-              <span class="num" style="font-size: 12px; color: var(--color-neutral-300);">{{ compare.curFile }}</span>
             </div>
             <div class="onimg" style="position: absolute; bottom: var(--space-4); left: var(--space-6); right: var(--space-6); font-size: 14px; color: var(--color-neutral-100);">AI 추정 1순위 · {{ compare.curDx }}</div>
           </div>
@@ -1171,9 +1161,9 @@ function buildPatient(sc, preds) {
     name: sc.displayName, ageSex: sc.age + '세 · ' + (sc.sex === 'Male' ? '남' : '여'),
     chartNo: sc.chartNo, visit: sc.visitDate, site: sc.site,
     vitals: vitals(sc),
-    os: { file: sc.osSourceFile, quality: sc.osArtifact ? '보통 · ' + sc.osArtifact : '양호',
+    os: { quality: sc.osArtifact ? '보통 · ' + sc.osArtifact : '양호',
           preds: osPreds, dr: osDr, img: displayImg(sc, 'os') },
-    od: { file: sc.odSourceFile, quality: sc.odArtifact ? '보통 · ' + sc.odArtifact : '양호',
+    od: { quality: sc.odArtifact ? '보통 · ' + sc.odArtifact : '양호',
           preds: odPreds, dr: odDr, img: displayImg(sc, 'od') },
     simOS: neighbors(sc, 'os', osPreds), simOD: neighbors(sc, 'od', odPreds),
     referrals: cl.referrals, tests: cl.tests, systemic: cl.systemic, notes: cl.notes,
@@ -1456,7 +1446,6 @@ class Component extends DCLogic {
           eyeLabel: EYE[eye].label,
           eyeCode: EYE[eye].code,
           curImg: p[eye].img,
-          curFile: p[eye].file,
           curDx: top1(eye)
             ? (LABELS[top1(eye)[0]] || '') + ' ' + Math.round(top1(eye)[1] * 100) + '%'
             : '추정 전',
@@ -1494,7 +1483,6 @@ class Component extends DCLogic {
       eye: v,
       label: EYE[v].label,
       code: EYE[v].code,
-      file: p[v].file,
       quality: p[v].quality,
       agree: this.agree(p, v),
       preds: this.pred(p[v].preds),
@@ -1586,8 +1574,6 @@ class Component extends DCLogic {
         + '반대쪽 눈의 소견과 무관하게 판단한 결과입니다.',
       normalLine: this.normalLine(p),
       notes: p.notes,
-      agreeOS: this.agree(p, 'os'),
-      agreeOD: this.agree(p, 'od'),
       // 사진 위 2단계 오버레이. 게이트를 넘은 눈에만 뜬다.
       osDrShow: drOS.show,
       osDrLabel: drOS.label,
